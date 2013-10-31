@@ -30,6 +30,8 @@ THUMBYSIZE=90
 
 BANDWIDTH=[18,43,36,5,17]
 
+NPERPAGE=24
+
 def get_video_url(url,novideo=False,bandwidth="5"):
     
     if novideo: 
@@ -61,7 +63,7 @@ def play_url_mplayer(url,novideo=False):
     player.wait()
     print "playing done"
         
-def search(terms):
+def search_feed(terms):
     def fetch_cb(start, maxresults, ordering):
         url = 'https://gdata.youtube.com/feeds/api/videos'
         query = {
@@ -85,7 +87,7 @@ def search(terms):
     return { 'fetch_cb': fetch_cb, 'description': 'search for "%s"' % (terms,) }
 
 
-def standard_feed(feed_name):
+def standard_feed(feed_name="most_popular"):
     def fetch_cb(start, maxresults, ordering):
         url = 'https://gdata.youtube.com/feeds/api/standardfeeds/%s' % (feed_name,)
         query = {
@@ -125,8 +127,6 @@ class TheTube(gtk.Window):
 
         self.bandwidth='/'.join(map(lambda x:str(x), BANDWIDTH))
         
-        self.current_search = None
-        self.ordering="relevance"
         self.playing=False
 
         vbox = gtk.VBox(False, 0);
@@ -146,11 +146,6 @@ class TheTube(gtk.Window):
         forwardButton.set_label("")
         toolbar.insert(forwardButton, -1)
 
-        self.upButton = gtk.ToolButton(gtk.STOCK_GO_UP);
-        self.upButton.set_is_important(True)
-        self.upButton.set_sensitive(False)
-#        toolbar.insert(self.upButton, -1)
-
         homeButton = gtk.ToolButton(gtk.STOCK_HOME)
         homeButton.set_is_important(True)
         homeButton.set_label("")
@@ -160,6 +155,16 @@ class TheTube(gtk.Window):
         exitButton.set_is_important(True)
         exitButton.set_label("")
         toolbar.insert(exitButton, -1)
+
+        homeButton.connect("clicked", self.on_home_clicked)
+        exitButton.connect("clicked", gtk.main_quit)
+        forwardButton.connect("clicked", self.on_forward)
+        backButton.connect("clicked", self.on_back)
+
+        self.homeButton=homeButton
+        self.exitButton=exitButton
+        self.forwardButton=forwardButton
+        self.backButton=backButton
 
         item = gtk.ToolItem()
         entry = gtk.Entry(150)
@@ -190,19 +195,12 @@ class TheTube(gtk.Window):
         vbox.pack_start(message,False,False,0)
         self.message=message
 
-
-        self.store = self.create_store()
-        self.fill_store()
-
-        iconView = gtk.IconView(self.store)
+        iconView = gtk.IconView()
         iconView.set_row_spacing(0)
         iconView.set_column_spacing(0)
 #        iconView.set_item_padding(4)
         iconView.set_columns(6)
         iconView.set_border_width(0)
-
-        homeButton.connect("clicked", self.on_home_clicked)
-        exitButton.connect("clicked", gtk.main_quit)
 
 #        iconView.set_text_column(COL_TITLE)
         iconView.set_pixbuf_column(COL_PIXBUF)
@@ -210,12 +208,16 @@ class TheTube(gtk.Window):
         iconView.set_selection_mode(gtk.SELECTION_SINGLE)
 
         iconView.connect("item-activated", self.on_item_activated)
-#        iconView.connect("selection-changed", self.on_selection_changed)
+        iconView.connect("selection-changed", self.on_selection_changed)
         sw.add(iconView)
         iconView.grab_focus()
+        self.iconView=iconView
 
         self.add(vbox)
         self.show_all()
+        
+        self.stores=dict()
+        self.set_store()
 
     def get_icon(self, name):
         theme = gtk.icon_theme_get_default()
@@ -228,15 +230,16 @@ class TheTube(gtk.Window):
         return store
             
 
-    def pull_image(self,url,row):
+    def pull_image(self,url,store,row):
 #        with lock:
         try:
           a=urllib.urlopen(url)
+          s=StringIO(a.read())
         except:
-          print "Exception"
-          raise Exception
-        s=StringIO(a.read())
-        a.close()
+          print "pull image fail"
+        finally:
+          if a:
+            a.close()  
         contents = s.getvalue()
         loader = gtk.gdk.PixbufLoader()  
         loader.write(contents, len(contents))  
@@ -247,45 +250,64 @@ class TheTube(gtk.Window):
         x=max(0,(w-THUMBXSIZE)/2+1)
         y=max(0,(h-THUMBYSIZE)/2+1)
         cropped=pixbuf.subpixbuf(x,y,min(THUMBXSIZE,w-x),min(THUMBYSIZE,h-y))
-        self.store.set(row, COL_PIXBUF, cropped)  
+        store.set(row, COL_PIXBUF, cropped)  
     
-    def fill_store(self):
-        self.store.clear()
+    def set_store(self, search=None, page=1, ordering="relevance"):
+        store=self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
+        self.feed_mesg=store['message']
+        self.update_mesg()
+        self.iconView.set_model(store['store'])
+        self.current_key=(search,page,ordering)
 
-        if self.current_search == None:
-          feed=standard_feed("most_viewed")
+        self.backButton.set_sensitive(False if store['istart']==1 else True)    
+        self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
+        self.iconView.set_cursor(0)
+    
+    def fetch_store(self, search=None, page=1, ordering="relevance"):
+
+        store=self.create_store()
+
+        if search == None:
+          feed=standard_feed()
         else:
-          feed=search(self.current_search)
+          feed=search_feed(search)
 
-        f=feed['fetch_cb'](1,24,self.ordering)
+        f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
         items= f['data']['items']
                 
         istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
         npp=f['data']['itemsPerPage']
+        last=istart-1+min(ntot,npp)
         
-        self.feed_mesg="showing %i - %i out of %i: "%(istart,istart-1+min(ntot,npp),ntot)+feed['description']
-        self.message.set_text(self.feed_mesg)
+        message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,ordering)
 
         for i,item in enumerate(items):
           url=item['thumbnail']['sqDefault']
           tooltip=item['title']+"\n"+item['uploader']+"\n\n"+ \
                   item['description'][:160]
-          row=self.store.append([item['title'], self.missing, item,tooltip,i])
-#          self.pull_image(url,row)
-          t=threading.Thread(target=self.pull_image, args=(url,row))
+          row=store.append([item['title'], self.missing, item,tooltip,i])
+          t=threading.Thread(target=self.pull_image, args=(url,store,row))
           t.daemon=True
           t.start()
+          
+        store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last)
+                  
+        return store
     
     def search(self,widget,entry):
-        self.current_search=entry.get_text()
-        self.fill_store()
+        self.set_store(search=entry.get_text())
         
-
     def on_home_clicked(self, widget):
-        self.current_search=None
-        self.fill_store()
-        self.upButton.set_sensitive(True)        
+        self.set_store()
+    
+    def on_forward(self,widget):
+        search,page,ordering=self.current_key
+        self.set_store( search, page+1, ordering )
+
+    def on_back(self,widget):
+        search,page,ordering=self.current_key
+        self.set_store( search, page-1, ordering )
     
     def on_item_activated(self, widget, item):
         model = widget.get_model()
