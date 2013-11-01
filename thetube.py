@@ -31,6 +31,8 @@ BANDWIDTH=[18,43,36,5,17]
 
 NPERPAGE=18
 
+FULLSCREEN=False
+
 def get_video_url(url,novideo=False,bandwidth="5"):
     
     if novideo: 
@@ -58,7 +60,7 @@ def play_url_mplayer(url,novideo=False):
             ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()])
     else:
       player = subprocess.Popen(
-            ['mplayer', ' ','--', url.decode('UTF-8').strip()])
+            ['mplayer', '-fs' if FULLSCREEN else ' ','--', url.decode('UTF-8').strip()])
     player.wait()
     print "playing done"
         
@@ -122,7 +124,8 @@ class TheTube(gtk.Window):
         
         self.connect("destroy", gtk.main_quit)
         self.set_title("TheTube")
-#        self.fullscreen()
+        if FULLSCREEN:
+          self.fullscreen()
 
         self.bandwidth='/'.join(map(lambda x:str(x), BANDWIDTH))
         
@@ -196,9 +199,10 @@ class TheTube(gtk.Window):
         vbox.pack_start(gtk.HSeparator(),False,False,0)
 
         description=gtk.Label("Welcome to The Tube")
-        description.set_size_request(780,96)
+        description.set_size_request(780,86)
         description.set_use_markup(False)
         description.set_justify(gtk.JUSTIFY_LEFT)
+        description.set_line_wrap(True)
         description.set_alignment(0,0)
         description.modify_font(pango.FontDescription("sans 8"))
         vbox.pack_start(description,False,False,0)
@@ -368,14 +372,14 @@ class TheTube(gtk.Window):
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
         print "Key %s (%d) was pressed" % (keyname, event.keyval)
-        if keyname in ["Up","Down","Left","Right"] and not self.iconView.has_focus():
+        if keyname in ["Up","Down","Left","Right"] and not self.iconView.is_focus():
           self.iconView.grab_focus()
           return True
         if keyname in ["Page_Down"]:
           self.on_forward()
         if keyname in ["Page_Up"]:
           self.on_back()
-        if self.entry.has_focus():
+        if self.entry.is_focus():
           return False
         if keyname in ["s","S"]:
           self.entry.grab_focus()
