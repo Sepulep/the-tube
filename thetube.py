@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import gtk
+import pango
 import os
 import urllib
 import urllib2
@@ -11,6 +12,7 @@ import gobject
 import subprocess
 import sys
 
+#lock=threading.Lock()
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -21,16 +23,13 @@ COL_ITEM = 2
 COL_TOOLTIP = 3
 COL_ORDER =4
 
-#from yt import search, standard_feed
-
-lock=threading.Lock()
 
 THUMBXSIZE=116
 THUMBYSIZE=90
 
 BANDWIDTH=[18,43,36,5,17]
 
-NPERPAGE=24
+NPERPAGE=18
 
 def get_video_url(url,novideo=False,bandwidth="5"):
     
@@ -107,7 +106,7 @@ def standard_feed(feed_name="most_popular"):
             sock.close()
         return result
 
-    feed = { 'fetch_cb': fetch_cb, 'description': '??? standard feed' }
+    feed = { 'fetch_cb': fetch_cb, 'description': 'standard feed' }
 
     if feed_name == 'most_viewed':
         feed['description'] = 'most viewed'
@@ -129,9 +128,10 @@ class TheTube(gtk.Window):
         
         self.playing=False
 
-        vbox = gtk.VBox(False, 0);
+        vbox = gtk.VBox(False, 0)
        
         toolbar = gtk.Toolbar()
+        toolbar.set_size_request(780,44)
         vbox.pack_start(toolbar, False, False, 0)
 
         backButton= gtk.ToolButton(gtk.STOCK_GO_BACK)
@@ -156,7 +156,7 @@ class TheTube(gtk.Window):
         exitButton.set_label("")
         toolbar.insert(exitButton, -1)
 
-        homeButton.connect("clicked", self.on_home_clicked)
+        homeButton.connect("clicked", self.on_home)
         exitButton.connect("clicked", gtk.main_quit)
         forwardButton.connect("clicked", self.on_forward)
         backButton.connect("clicked", self.on_back)
@@ -167,20 +167,15 @@ class TheTube(gtk.Window):
         self.backButton=backButton
 
         item = gtk.ToolItem()
+        item.set_expand(True)
         entry = gtk.Entry(150)
-        entry.set_width_chars(30)
+#        entry.set_width_chars(60)
+        entry.modify_font(pango.FontDescription("sans 9"))
         item.add(entry)
-        entry.connect("activate", self.search, entry)
-        toolbar.insert(item, -1)
+        entry.connect("activate", self.on_search, entry)
+        self.entry=entry
+        toolbar.insert(item,-1)
 
-#        item = gtk.ToolItem()
-#        label=gtk.Label("TheTube")
-#        label.set_justify( gtk.JUSTIFY_RIGHT)
-#        item.add(label)
-#        toolbar.insert(item, -1)
-
-
-#        self.missing= self.get_icon(gtk.STOCK_MISSING_IMAGE)
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
         self.missing.fill(0x0)
 
@@ -192,8 +187,23 @@ class TheTube(gtk.Window):
 
         message=gtk.Label(" ")
         message.set_single_line_mode(True)
+        message.set_size_request(780,20)
+        message.modify_font(pango.FontDescription("sans 9"))
+
         vbox.pack_start(message,False,False,0)
         self.message=message
+
+        vbox.pack_start(gtk.HSeparator(),False,False,0)
+
+        description=gtk.Label("Welcome to The Tube")
+        description.set_size_request(780,96)
+        description.set_use_markup(False)
+        description.set_justify(gtk.JUSTIFY_LEFT)
+        description.set_alignment(0,0)
+        description.modify_font(pango.FontDescription("sans 8"))
+        vbox.pack_start(description,False,False,0)
+        self.description=description
+        
 
         iconView = gtk.IconView()
         iconView.set_row_spacing(0)
@@ -204,7 +214,7 @@ class TheTube(gtk.Window):
 
 #        iconView.set_text_column(COL_TITLE)
         iconView.set_pixbuf_column(COL_PIXBUF)
-        iconView.set_tooltip_column(COL_TOOLTIP)
+#        iconView.set_tooltip_column(COL_TOOLTIP)
         iconView.set_selection_mode(gtk.SELECTION_SINGLE)
 
         iconView.connect("item-activated", self.on_item_activated)
@@ -219,6 +229,8 @@ class TheTube(gtk.Window):
         self.stores=dict()
         self.set_store()
 
+        self.connect('key_press_event', self.on_key_press_event)
+        
     def get_icon(self, name):
         theme = gtk.icon_theme_get_default()
         return theme.load_icon(name, 48, 0)
@@ -257,6 +269,7 @@ class TheTube(gtk.Window):
         self.feed_mesg=store['message']
         self.update_mesg()
         self.iconView.set_model(store['store'])
+        self.store=store
         self.current_key=(search,page,ordering)
 
         self.backButton.set_sensitive(False if store['istart']==1 else True)    
@@ -273,41 +286,48 @@ class TheTube(gtk.Window):
           feed=search_feed(search)
 
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
-        items= f['data']['items']
-                
+
         istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
         npp=f['data']['itemsPerPage']
         last=istart-1+min(ntot,npp)
-        
-        message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,ordering)
 
-        for i,item in enumerate(items):
-          url=item['thumbnail']['sqDefault']
-          tooltip=item['title']+"\n"+item['uploader']+"\n\n"+ \
-                  item['description'][:160]
-          row=store.append([item['title'], self.missing, item,tooltip,i])
-          t=threading.Thread(target=self.pull_image, args=(url,store,row))
-          t.daemon=True
-          t.start()
+        if ntot>0:
+          items= f['data']['items']
+  
+          message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,ordering)
+  
+          for i,item in enumerate(items):
+            url=item['thumbnail']['sqDefault']
+            tooltip="["+item['uploader']+"] "+item['title']+"\n\n"+ \
+                    item['description'][:200]
+            row=store.append([item['title'], self.missing, item,tooltip,i])
+            t=threading.Thread(target=self.pull_image, args=(url,store,row))
+            t.daemon=True
+            t.start()
+        else:
+          message=feed['description']+": no results"
           
         store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last)
                   
         return store
-    
-    def search(self,widget,entry):
-        self.set_store(search=entry.get_text())
         
-    def on_home_clicked(self, widget):
+    def on_search(self,widget,entry):
+        self.set_store(search=entry.get_text())
+        self.iconView.grab_focus()
+        
+    def on_home(self, widget=None):
         self.set_store()
     
-    def on_forward(self,widget):
+    def on_forward(self,widget=None):
         search,page,ordering=self.current_key
-        self.set_store( search, page+1, ordering )
+        if self.store['last']<self.store['ntot']:    
+          self.set_store( search, page+1, ordering )
 
-    def on_back(self,widget):
+    def on_back(self,widget=None):
         search,page,ordering=self.current_key
-        self.set_store( search, page-1, ordering )
+        if self.store['istart']>1:    
+          self.set_store( search, page-1, ordering )
     
     def on_item_activated(self, widget, item):
         model = widget.get_model()
@@ -329,7 +349,9 @@ class TheTube(gtk.Window):
 
     def on_selection_changed(self, widget):
          print "selection changed"
-         pass
+         item=self.iconView.get_selected_items()[0]
+         model = self.iconView.get_model()
+         self.description.set_text(model[item][COL_TOOLTIP])
 
     def update_mesg(self):
          if self.feed_mesg:
@@ -342,7 +364,29 @@ class TheTube(gtk.Window):
         self.message.set_text("stopped playing "+title)
         self.playing=False
         gobject.timeout_add(3000, self.update_mesg)
-    
+  
+    def on_key_press_event(self,widget, event):
+        keyname = gtk.gdk.keyval_name(event.keyval)
+        print "Key %s (%d) was pressed" % (keyname, event.keyval)
+        if keyname in ["Up","Down","Left","Right"] and not self.iconView.has_focus():
+          self.iconView.grab_focus()
+          return True
+        if keyname in ["Page_Down"]:
+          self.on_forward()
+        if keyname in ["Page_Up"]:
+          self.on_back()
+        if self.entry.has_focus():
+          return False
+        if keyname in ["s","S"]:
+          self.entry.grab_focus()
+          return True
+        if keyname in ["n","N"]:
+          self.on_forward()
+        if keyname in ["p","P"]:
+          self.on_back()
+        if keyname in ["Q","q"]:
+          gtk.main_quit()
+              
     def __del__(self):
         ts=threading.enumerate()
         for t in ts[1:]:
