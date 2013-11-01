@@ -23,7 +23,6 @@ COL_ITEM = 2
 COL_TOOLTIP = 3
 COL_ORDER =4
 
-
 THUMBXSIZE=116
 THUMBYSIZE=90
 
@@ -133,31 +132,35 @@ class TheTube(gtk.Window):
 
         vbox = gtk.VBox(False, 0)
        
-        toolbar = gtk.Toolbar()
-        toolbar.set_size_request(780,44)
+        toolbar = gtk.HBox()
+        toolbar.set_size_request(780,36)
         vbox.pack_start(toolbar, False, False, 0)
 
-        backButton= gtk.ToolButton(gtk.STOCK_GO_BACK)
-        backButton.set_is_important(True)
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_GO_BACK, gtk.ICON_SIZE_MENU)
+        backButton = gtk.Button()
+        backButton.add(image)
+        toolbar.pack_start(backButton,False,False,0)
         backButton.set_sensitive(False)
-        backButton.set_label("")
-        toolbar.insert(backButton, -1)
 
-        forwardButton= gtk.ToolButton(gtk.STOCK_GO_FORWARD)
-        forwardButton.set_is_important(True)
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_MENU)
+        forwardButton = gtk.Button()
+        forwardButton.add(image)
+        toolbar.pack_start(forwardButton,False,False,0)
         forwardButton.set_sensitive(False)
-        forwardButton.set_label("")
-        toolbar.insert(forwardButton, -1)
 
-        homeButton = gtk.ToolButton(gtk.STOCK_HOME)
-        homeButton.set_is_important(True)
-        homeButton.set_label("")
-        toolbar.insert(homeButton, -1)
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_HOME, gtk.ICON_SIZE_MENU)
+        homeButton = gtk.Button()
+        homeButton.add(image)
+        toolbar.pack_start(homeButton,False,False,0)
 
-        exitButton = gtk.ToolButton(gtk.STOCK_QUIT)
-        exitButton.set_is_important(True)
-        exitButton.set_label("")
-        toolbar.insert(exitButton, -1)
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_MENU)
+        exitButton = gtk.Button()
+        exitButton.add(image)
+        toolbar.pack_start(exitButton,False,False,0)
 
         homeButton.connect("clicked", self.on_home)
         exitButton.connect("clicked", gtk.main_quit)
@@ -169,15 +172,11 @@ class TheTube(gtk.Window):
         self.forwardButton=forwardButton
         self.backButton=backButton
 
-        item = gtk.ToolItem()
-        item.set_expand(True)
         entry = gtk.Entry(150)
-#        entry.set_width_chars(60)
         entry.modify_font(pango.FontDescription("sans 9"))
-        item.add(entry)
         entry.connect("activate", self.on_search, entry)
         self.entry=entry
-        toolbar.insert(item,-1)
+        toolbar.pack_end(entry,True,True,0)
 
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
         self.missing.fill(0x0)
@@ -198,13 +197,13 @@ class TheTube(gtk.Window):
 
         vbox.pack_start(gtk.HSeparator(),False,False,0)
 
-        description=gtk.Label("Welcome to The Tube")
-        description.set_size_request(780,86)
+        description=gtk.Label(" Welcome to The Tube\n 's' = search\n 'n' = next results, 'p' = previous results\n 'q' = quit")
+        description.set_size_request(780,90)
         description.set_use_markup(False)
         description.set_justify(gtk.JUSTIFY_LEFT)
         description.set_line_wrap(True)
         description.set_alignment(0,0)
-        description.modify_font(pango.FontDescription("sans 8"))
+        description.modify_font(pango.FontDescription("sans 9"))
         vbox.pack_start(description,False,False,0)
         self.description=description
         
@@ -212,13 +211,10 @@ class TheTube(gtk.Window):
         iconView = gtk.IconView()
         iconView.set_row_spacing(0)
         iconView.set_column_spacing(0)
-#        iconView.set_item_padding(4)
         iconView.set_columns(6)
         iconView.set_border_width(0)
 
-#        iconView.set_text_column(COL_TITLE)
         iconView.set_pixbuf_column(COL_PIXBUF)
-#        iconView.set_tooltip_column(COL_TOOLTIP)
         iconView.set_selection_mode(gtk.SELECTION_SINGLE)
 
         iconView.connect("item-activated", self.on_item_activated)
@@ -234,18 +230,12 @@ class TheTube(gtk.Window):
         self.set_store()
 
         self.connect('key_press_event', self.on_key_press_event)
-        
-    def get_icon(self, name):
-        theme = gtk.icon_theme_get_default()
-        return theme.load_icon(name, 48, 0)
-    
-
+            
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
         store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
         return store
             
-
     def pull_image(self,url,store,row):
 #        with lock:
         try:
@@ -304,7 +294,7 @@ class TheTube(gtk.Window):
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
             tooltip="["+item['uploader']+"] "+item['title']+"\n\n"+ \
-                    item['description'][:200]
+                    item['description'][:300]
             row=store.append([item['title'], self.missing, item,tooltip,i])
             t=threading.Thread(target=self.pull_image, args=(url,store,row))
             t.daemon=True
@@ -352,7 +342,6 @@ class TheTube(gtk.Window):
         t.start()
 
     def on_selection_changed(self, widget):
-         print "selection changed"
          item=self.iconView.get_selected_items()[0]
          model = self.iconView.get_model()
          self.description.set_text(model[item][COL_TOOLTIP])
@@ -360,9 +349,17 @@ class TheTube(gtk.Window):
     def update_mesg(self):
          if self.feed_mesg:
            self.message.set_text(self.feed_mesg)
-           
+ 
+    def busy_message(self,arg):
+        ibusy=arg[1]
+        title=arg[0]
+        ibusy+=1  
+        self.message.set_text("busy buffering "+title+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
+        if self.playing:
+          gobject.timeout_add(1000, self.busy_message,(title,ibusy))
+
     def play(self,url,title):
-        self.message.set_text("start playing "+title)
+        gobject.timeout_add(1000, self.busy_message,(title,0))
         url=get_video_url(url,bandwidth=self.bandwidth)
         play_url(url)
         self.message.set_text("stopped playing "+title)
@@ -371,7 +368,7 @@ class TheTube(gtk.Window):
   
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
-        print "Key %s (%d) was pressed" % (keyname, event.keyval)
+#        print "Key %s (%d) was pressed" % (keyname, event.keyval)
         if keyname in ["Up","Down","Left","Right"] and not self.iconView.is_focus():
           self.iconView.grab_focus()
           return True
@@ -388,7 +385,7 @@ class TheTube(gtk.Window):
           self.on_forward()
         if keyname in ["p","P"]:
           self.on_back()
-        if keyname in ["Q","q"]:
+        if keyname in ["Q","q","Escape"]:
           gtk.main_quit()
               
     def __del__(self):
