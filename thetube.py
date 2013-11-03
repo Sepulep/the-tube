@@ -11,6 +11,8 @@ import json
 import gobject
 import subprocess
 import sys
+import datetime
+import atexit
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -22,7 +24,7 @@ COL_TOOLTIP = 3
 COL_ORDER =4
 
 THUMBXSIZE=116
-THUMBYSIZE=84
+THUMBYSIZE=90
 
 BANDWIDTH=[18,36,5,17]
 
@@ -31,6 +33,10 @@ NPERPAGE=24
 FULLSCREEN=False
 
 PRELOAD_YTDL=True
+
+def kill_process(x):
+  if x.poll() is None:
+    x.kill()
 
 def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None):
     
@@ -42,7 +48,8 @@ def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None):
       print call
       yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
         stdin=subprocess.PIPE, shell=True)
-    
+      atexit.register(kill_process,yt_dl)
+
     if preload:
       return yt_dl
     
@@ -66,6 +73,7 @@ def play_url_mplayer(url,novideo=False,fullscreen=False):
     else:
       player = subprocess.Popen(
             ['mplayer', '-fs' if fullscreen else ' ','--', url.decode('UTF-8').strip()])
+    atexit.register(kill_process,player)
     player.wait()
     print "playing done"
         
@@ -81,10 +89,11 @@ def search_feed(terms):
             'orderby': ordering,
         }
         try:
+          sock=None
           sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
           result=json.load(sock)
         except:
-          result={}
+          result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
         finally:  
           if sock:
             sock.close()
@@ -128,6 +137,10 @@ class TheTube(gtk.Window):
         self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
         self.playing=False
 
+        self.ordering=0
+        self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
+        self.orderings=self.order_dict.keys()
+
         super(TheTube, self).__init__()        
         self.set_size_request(800, 480)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -142,6 +155,12 @@ class TheTube(gtk.Window):
         toolbar = gtk.HBox()
         toolbar.set_size_request(780,36)
         vbox.pack_start(toolbar, False, False, 0)
+
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_HELP, gtk.ICON_SIZE_MENU)
+        helpButton = gtk.Button()
+        helpButton.add(image)
+        toolbar.pack_start(helpButton,False,False,0)
 
         image = gtk.Image()
         image.set_from_stock(gtk.STOCK_GO_BACK, gtk.ICON_SIZE_MENU)
@@ -164,15 +183,25 @@ class TheTube(gtk.Window):
         toolbar.pack_start(homeButton,False,False,0)
 
         image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_SORT_ASCENDING, gtk.ICON_SIZE_MENU)
+        sortButton = gtk.Button()
+        sortButton.add(image)
+        toolbar.pack_start(sortButton,False,False,0)
+
+
+        image = gtk.Image()
         image.set_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_MENU)
         exitButton = gtk.Button()
         exitButton.add(image)
-        toolbar.pack_start(exitButton,False,False,0)
+        toolbar.pack_end(exitButton,False,False,0)
 
+        helpButton.connect("clicked", self.on_help)
         homeButton.connect("clicked", self.on_home)
         exitButton.connect("clicked", gtk.main_quit)
         forwardButton.connect("clicked", self.on_forward)
         backButton.connect("clicked", self.on_back)
+        sortButton.connect("clicked", self.on_order)
+
 
         self.homeButton=homeButton
         self.exitButton=exitButton
@@ -201,19 +230,19 @@ class TheTube(gtk.Window):
         vbox.pack_start(message,False,False,0)
         self.message=message
 
-        vbox.pack_start(gtk.HSeparator(),False,False,0)
+#        vbox.pack_start(gtk.HSeparator(),False,False,0)
 
-        description=gtk.Label(" Welcome to The Tube! 's' = search, 'n' = next results, 'p' = previous results, 'q' = quit")
-        description.set_size_request(780,20)
-        description.set_use_markup(False)
-        description.set_justify(gtk.JUSTIFY_LEFT)
-        description.set_line_wrap(True)
-        description.set_alignment(0,0)
-        description.modify_font(pango.FontDescription("sans 9"))
-        vbox.pack_start(description,False,False,0)
-        self.description=description
+#        description=gtk.Label(" Welcome to The Tube! 's' = search, 'n' = next results, 'p' = previous results, 'q' = quit")
+#        description.set_size_request(780,20)
+#        description.set_use_markup(False)
+#        description.set_justify(gtk.JUSTIFY_LEFT)
+#        description.set_line_wrap(True)
+#        description.set_alignment(0,0)
+#        description.modify_font(pango.FontDescription("sans 9"))
+
+#        vbox.pack_start(description,False,False,0)
+#        self.description=description
         
-
         iconView = gtk.IconView()
         iconView.set_row_spacing(0)
         iconView.set_column_spacing(0)
@@ -233,6 +262,9 @@ class TheTube(gtk.Window):
         
         self.stores=dict()
         self.set_store()
+
+        self.message.set_text(" Welcome to The Tube!")
+        gobject.timeout_add(2000, self.on_help)
 
         self.connect('key_press_event', self.on_key_press_event)
 
@@ -272,6 +304,7 @@ class TheTube(gtk.Window):
     
     def set_store(self, search=None, page=1, ordering="relevance"):
         store=self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
+        self.ordering=ordering
         self.feed_mesg=store['message']
         self.update_mesg()
         self.iconView.set_model(store['store'])
@@ -300,12 +333,13 @@ class TheTube(gtk.Window):
 
         if ntot>0:
           items= f['data']['items']
-  
-          message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,ordering)
+          
+          message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
   
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
-            tooltip="["+item['uploader']+"] "+item['title']#+"\n\n"+item['description'][:300]
+            timestring=str(datetime.timedelta(seconds=item['duration']))
+            tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']#+"\n\n"+item['description'][:300]
             row=store.append([item['title'], self.missing, item,tooltip,i])
             t=threading.Thread(target=self.pull_image, args=(url,store,row))
             t.daemon=True
@@ -318,7 +352,7 @@ class TheTube(gtk.Window):
         return store
         
     def on_search(self,widget,entry):
-        self.set_store(search=entry.get_text())
+        self.set_store(search=entry.get_text(),ordering=self.ordering)
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
@@ -329,6 +363,11 @@ class TheTube(gtk.Window):
         if self.store['last']<self.store['ntot']:    
           self.set_store( search, page+1, ordering )
 
+    def on_order(self,widget=None):
+        search,page,ordering=self.current_key
+        new_ordering=self.orderings[ (self.orderings.index(ordering)+1)%len(self.orderings)]
+        self.set_store( search, 1, new_ordering)
+      
     def on_back(self,widget=None):
         search,page,ordering=self.current_key
         if self.store['istart']>1:    
@@ -355,7 +394,7 @@ class TheTube(gtk.Window):
     def on_selection_changed(self, widget):
          item=self.iconView.get_selected_items()[0]
          model = self.iconView.get_model()
-         self.description.set_text(model[item][COL_TOOLTIP])
+         self.message.set_text(model[item][COL_TOOLTIP])
 
     def update_mesg(self):
          if self.feed_mesg:
@@ -365,7 +404,7 @@ class TheTube(gtk.Window):
         ibusy=arg[1]
         title=arg[0]
         ibusy+=1  
-        self.message.set_text("busy buffering "+title+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
+        self.message.set_text("busy buffering "+title[:60]+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
         if self.playing:
           gobject.timeout_add(1000, self.busy_message,(title,ibusy))
 
@@ -375,15 +414,19 @@ class TheTube(gtk.Window):
         play_url(url,fullscreen=self.fullscreen)
         self.message.set_text("stopped playing "+title)
         self.playing=False
-        gobject.timeout_add(1000, self.update_mesg)
+        gobject.timeout_add(2000, self.update_mesg)
         if self.preload_ytdl:
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
-        
-  
+
+    def on_help(self,widget=None):        
+        self.message.set_text("'h' = help, 's' = search, 'n' = next results, 'p' = previous results,"+
+           " 'o'= change order, 'q' = quit")
+        gobject.timeout_add(5000, self.update_mesg)
+
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
 #        print "Key %s (%d) was pressed" % (keyname, event.keyval)
-        if keyname in ["Up","Down","Left","Right"] and not self.iconView.is_focus():
+        if keyname in ["Up","Down"] and not self.iconView.is_focus():
           self.iconView.grab_focus()
           return True
         if keyname in ["Page_Down"]:
@@ -393,15 +436,20 @@ class TheTube(gtk.Window):
         if self.entry.is_focus():
           return False
         if keyname in ["s","S"]:
+          self.update_mesg()
           self.entry.grab_focus()
           return True
         if keyname in ["n","N"]:
           self.on_forward()
         if keyname in ["p","P"]:
           self.on_back()
+        if keyname in ["o","O"]:
+          self.on_order()
         if keyname in ["Q","q","Escape"]:
           gtk.main_quit()
-              
+        if keyname in ["h","H"]:
+          self.on_help()
+
     def __del__(self):
         ts=threading.enumerate()
         for t in ts[1:]:
