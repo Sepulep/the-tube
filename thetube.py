@@ -147,7 +147,7 @@ class TheTube(gtk.Window):
         self.set_position(gtk.WIN_POS_CENTER)
         
         self.connect("destroy", gtk.main_quit)
-        self.set_title("TheTube")
+        self.set_title("The Tube")
         if self.showfullscreen:
           self.fullscreen()
           
