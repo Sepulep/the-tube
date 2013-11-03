@@ -13,6 +13,7 @@ import subprocess
 import sys
 import datetime
 import atexit
+from optparse import OptionParser
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -229,19 +230,6 @@ class TheTube(gtk.Window):
 
         vbox.pack_start(message,False,False,0)
         self.message=message
-
-#        vbox.pack_start(gtk.HSeparator(),False,False,0)
-
-#        description=gtk.Label(" Welcome to The Tube! 's' = search, 'n' = next results, 'p' = previous results, 'q' = quit")
-#        description.set_size_request(780,20)
-#        description.set_use_markup(False)
-#        description.set_justify(gtk.JUSTIFY_LEFT)
-#        description.set_line_wrap(True)
-#        description.set_alignment(0,0)
-#        description.modify_font(pango.FontDescription("sans 9"))
-
-#        vbox.pack_start(description,False,False,0)
-#        self.description=description
         
         iconView = gtk.IconView()
         iconView.set_row_spacing(0)
@@ -281,7 +269,6 @@ class TheTube(gtk.Window):
         return store
             
     def pull_image(self,url,store,row):
-#        with lock:
         try:
           a=urllib.urlopen(url)
           s=StringIO(a.read())
@@ -339,7 +326,7 @@ class TheTube(gtk.Window):
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
             timestring=str(datetime.timedelta(seconds=item['duration']))
-            tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']#+"\n\n"+item['description'][:300]
+            tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
             row=store.append([item['title'], self.missing, item,tooltip,i])
             t=threading.Thread(target=self.pull_image, args=(url,store,row))
             t.daemon=True
@@ -456,6 +443,23 @@ class TheTube(gtk.Window):
           if t.isAlive():
             t._Thread__stop()
 
+def new_option_parser():
+    result = OptionParser(usage="usage: %prog [options]")
+    result.add_option("-f", action="store_true", dest="fullscreen",
+                      help="run fullscreen (recommend 800x480)",default=False)
+    result.add_option("-p", action="store_true", dest="preload_ytdl",
+                      help="preload youtube-dl",default=False)
+    result.add_option("-q", action="store_true", dest="low_quality",
+                      help="prefer low quality (240p)",default=False)
+    return result
+
 if __name__=="__main__":
-  TheTube( fullscreen=FULLSCREEN,preload_ytdl=PRELOAD_YTDL,bandwidth=BANDWIDTH)
+  (options, args) = new_option_parser().parse_args()  
+  print options
+  if options.low_quality:
+    BANDWIDTH=[5,17,18,36]
+  else:
+    BANDWIDTH=[18,36,5,17]
+
+  TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,bandwidth=BANDWIDTH)
   gtk.main()
