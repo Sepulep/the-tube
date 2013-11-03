@@ -133,14 +133,14 @@ def standard_feed(feed_name="most_popular"):
 
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,bandwidth=[5]):
-        self.fullscreen=fullscreen
+        self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
         self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
         self.playing=False
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
-        self.orderings=self.order_dict.keys()
+        self.orderings=["relevance","published","viewCount","rating"]
 
         super(TheTube, self).__init__()        
         self.set_size_request(800, 480)
@@ -148,7 +148,7 @@ class TheTube(gtk.Window):
         
         self.connect("destroy", gtk.main_quit)
         self.set_title("TheTube")
-        if self.fullscreen:
+        if self.showfullscreen:
           self.fullscreen()
           
         vbox = gtk.VBox(False, 0)
@@ -315,6 +315,8 @@ class TheTube(gtk.Window):
 
         istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
+        if len(f['data']['items'])<NPERPAGE:
+          ntot=len(f['data']['items'])
         npp=f['data']['itemsPerPage']
         last=istart-1+min(ntot,npp)
 
@@ -339,7 +341,7 @@ class TheTube(gtk.Window):
         return store
         
     def on_search(self,widget,entry):
-        self.set_store(search=entry.get_text(),ordering=self.ordering)
+        self.set_store(search=entry.get_text(),ordering=self.orderings[0])
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
@@ -407,7 +409,7 @@ class TheTube(gtk.Window):
 
     def on_help(self,widget=None):        
         self.message.set_text("'h' = help, 's' = search, 'n' = next results, 'p' = previous results,"+
-           " 'o'= change order, 'q' = quit")
+           " 'o'= change order, 'enter' = play, 'q' = quit")
         gobject.timeout_add(5000, self.update_mesg)
 
     def on_key_press_event(self,widget, event):
