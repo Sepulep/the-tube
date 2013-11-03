@@ -12,8 +12,6 @@ import gobject
 import subprocess
 import sys
 
-#lock=threading.Lock()
-
 #gobject.threads_init() 
 gtk.gdk.threads_init()
 
@@ -24,23 +22,31 @@ COL_TOOLTIP = 3
 COL_ORDER =4
 
 THUMBXSIZE=116
-THUMBYSIZE=90
+THUMBYSIZE=84
 
-BANDWIDTH=[18,43,36,5,17]
+BANDWIDTH=[18,36,5,17]
 
-NPERPAGE=18
+NPERPAGE=24
 
 FULLSCREEN=False
 
-def get_video_url(url,novideo=False,bandwidth="5"):
+PRELOAD_YTDL=True
+
+def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None):
     
-    if novideo: 
+    if novideo and not preload: 
       bandwidth="5/18/43"
     
-    call = "./youtube-dl -g -f " + bandwidth + " " + url
+    if yt_dl is None:
+      call = "./youtube-dl -g -f " + bandwidth + " -a -"
+      print call
+      yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+        stdin=subprocess.PIPE, shell=True)
     
-    yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE, stderr = subprocess.PIPE, shell=True)
-    (url, err) = yt_dl.communicate()
+    if preload:
+      return yt_dl
+    
+    (url, err) = yt_dl.communicate(input=url)
         
     if yt_dl.returncode != 0:
       sys.stderr.write(err)
@@ -48,18 +54,18 @@ def get_video_url(url,novideo=False,bandwidth="5"):
 
     return url
     
-def play_url(url, player="mplayer",novideo=False):
+def play_url(url, player="mplayer",novideo=False, fullscreen=False):
     assert player in ["mplayer"]
     if player == "mplayer":
-        play_url_mplayer(url,novideo)
+        play_url_mplayer(url,novideo,fullscreen)
     
-def play_url_mplayer(url,novideo=False):
+def play_url_mplayer(url,novideo=False,fullscreen=False):
     if novideo:
       player = subprocess.Popen(
             ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()])
     else:
       player = subprocess.Popen(
-            ['mplayer', '-fs' if FULLSCREEN else ' ','--', url.decode('UTF-8').strip()])
+            ['mplayer', '-fs' if fullscreen else ' ','--', url.decode('UTF-8').strip()])
     player.wait()
     print "playing done"
         
@@ -98,10 +104,11 @@ def standard_feed(feed_name="most_popular"):
             'orderby': ordering,
         }
         try:
+          sock=None
           sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
           result=json.load(sock)
         except:
-          result={}
+          result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
         finally:  
           if sock:
             sock.close()
@@ -115,21 +122,21 @@ def standard_feed(feed_name="most_popular"):
     return feed
 
 class TheTube(gtk.Window): 
-    def __init__(self):
-        super(TheTube, self).__init__()
-        
+    def __init__(self, fullscreen=False,preload_ytdl=False,bandwidth=[5]):
+        self.fullscreen=fullscreen
+        self.preload_ytdl=preload_ytdl
+        self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
+        self.playing=False
+
+        super(TheTube, self).__init__()        
         self.set_size_request(800, 480)
         self.set_position(gtk.WIN_POS_CENTER)
         
         self.connect("destroy", gtk.main_quit)
         self.set_title("TheTube")
-        if FULLSCREEN:
+        if self.fullscreen:
           self.fullscreen()
-
-        self.bandwidth='/'.join(map(lambda x:str(x), BANDWIDTH))
-        
-        self.playing=False
-
+          
         vbox = gtk.VBox(False, 0)
        
         toolbar = gtk.HBox()
@@ -183,7 +190,6 @@ class TheTube(gtk.Window):
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
-#        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
         vbox.pack_start(sw, True, True, 0)
 
@@ -197,8 +203,8 @@ class TheTube(gtk.Window):
 
         vbox.pack_start(gtk.HSeparator(),False,False,0)
 
-        description=gtk.Label(" Welcome to The Tube\n 's' = search\n 'n' = next results, 'p' = previous results\n 'q' = quit")
-        description.set_size_request(780,90)
+        description=gtk.Label(" Welcome to The Tube! 's' = search, 'n' = next results, 'p' = previous results, 'q' = quit")
+        description.set_size_request(780,20)
         description.set_use_markup(False)
         description.set_justify(gtk.JUSTIFY_LEFT)
         description.set_line_wrap(True)
@@ -224,12 +230,18 @@ class TheTube(gtk.Window):
         self.iconView=iconView
 
         self.add(vbox)
-        self.show_all()
         
         self.stores=dict()
         self.set_store()
 
         self.connect('key_press_event', self.on_key_press_event)
+
+        self.yt_dl=None
+        if self.preload_ytdl:
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
+
+        self.show_all()
+
             
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
@@ -293,8 +305,7 @@ class TheTube(gtk.Window):
   
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
-            tooltip="["+item['uploader']+"] "+item['title']+"\n\n"+ \
-                    item['description'][:300]
+            tooltip="["+item['uploader']+"] "+item['title']#+"\n\n"+item['description'][:300]
             row=store.append([item['title'], self.missing, item,tooltip,i])
             t=threading.Thread(target=self.pull_image, args=(url,store,row))
             t.daemon=True
@@ -360,11 +371,14 @@ class TheTube(gtk.Window):
 
     def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,(title,0))
-        url=get_video_url(url,bandwidth=self.bandwidth)
-        play_url(url)
+        url=get_video_url(url,bandwidth=self.bandwidth,yt_dl=self.yt_dl)
+        play_url(url,fullscreen=self.fullscreen)
         self.message.set_text("stopped playing "+title)
         self.playing=False
-        gobject.timeout_add(3000, self.update_mesg)
+        gobject.timeout_add(1000, self.update_mesg)
+        if self.preload_ytdl:
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
+        
   
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
@@ -394,6 +408,6 @@ class TheTube(gtk.Window):
           if t.isAlive():
             t._Thread__stop()
 
-            
-TheTube()
-gtk.main()
+if __name__=="__main__":
+  TheTube( fullscreen=FULLSCREEN,preload_ytdl=PRELOAD_YTDL,bandwidth=BANDWIDTH)
+  gtk.main()
