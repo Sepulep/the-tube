@@ -73,7 +73,7 @@ def play_url_mplayer(url,novideo=False,fullscreen=False):
             ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()])
     else:
       player = subprocess.Popen(
-            ['mplayer', '-fs' if fullscreen else ' ','--', url.decode('UTF-8').strip()])
+            ['mplayer', '-quiet', '-fs' if fullscreen else ' ','--', url.decode('UTF-8').strip()])
     atexit.register(kill_process,player)
     player.wait()
     print "playing done"
@@ -400,7 +400,7 @@ class TheTube(gtk.Window):
     def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,(title,0))
         url=get_video_url(url,bandwidth=self.bandwidth,yt_dl=self.yt_dl)
-        play_url(url,fullscreen=self.fullscreen)
+        play_url(url,fullscreen=self.showfullscreen)
         self.message.set_text("stopped playing "+title)
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
