@@ -154,7 +154,7 @@ class TheTube(gtk.Window):
         vbox = gtk.VBox(False, 0)
        
         toolbar = gtk.HBox()
-        toolbar.set_size_request(780,36)
+        toolbar.set_size_request(780,34)
         vbox.pack_start(toolbar, False, False, 0)
 
         image = gtk.Image()
@@ -194,7 +194,7 @@ class TheTube(gtk.Window):
         image.set_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_MENU)
         exitButton = gtk.Button()
         exitButton.add(image)
-        toolbar.pack_end(exitButton,False,False,0)
+        toolbar.pack_start(exitButton,False,False,0)
 
         helpButton.connect("clicked", self.on_help)
         homeButton.connect("clicked", self.on_home)
@@ -315,14 +315,15 @@ class TheTube(gtk.Window):
 
         istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
-        if len(f['data']['items'])<NPERPAGE:
-          ntot=len(f['data']['items'])
         npp=f['data']['itemsPerPage']
         last=istart-1+min(ntot,npp)
 
         if ntot>0:
           items= f['data']['items']
-          
+
+          if len(items)<NPERPAGE:
+            ntot=len(items)
+
           message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
   
           for i,item in enumerate(items):
