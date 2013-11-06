@@ -73,12 +73,16 @@ def play_url(url, player="mplayer",novideo=False, fullscreen=False, omapfb=False
     
 def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
     if novideo:
-      player = subprocess.Popen(
-            ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()])
+      call = ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()]
     else:
-      player = subprocess.Popen(
-            ['mplayer', '-quiet', '-fs' if fullscreen else ' ',
-              '-vo omapfb' if omapfb else ' ','--', url.decode('UTF-8').strip()])
+      call = ['mplayer', '-quiet']
+      if fullscreen:
+        call.extend(['-fs'])
+      if omapfb:
+        call.extend(['-vo','omapfb'])
+      call.append('--')
+      call.append(url.decode('UTF-8').strip())
+    player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()
     print "playing done"
