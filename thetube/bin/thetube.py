@@ -141,6 +141,7 @@ class TheTube(gtk.Window):
         self.preload_ytdl=preload_ytdl
         self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
         self.playing=False
+        self.feed_mesg=""
         self.download_directory=os.getenv("HOME")+"/movie"
 
         self.ordering=0
@@ -226,7 +227,7 @@ class TheTube(gtk.Window):
         toolbar.pack_end(entry,True,True,0)
 
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
-        self.missing.fill(0x0)
+        self.missing.fill(0x151515)
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
@@ -246,6 +247,14 @@ class TheTube(gtk.Window):
         iconView.set_column_spacing(0)
         iconView.set_columns(6)
         iconView.set_border_width(0)
+        iconView.modify_base(gtk.STATE_NORMAL, gtk.gdk.Color("black"))
+        
+#        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 0., blue = 0.))
+#        self.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(red = 1., green = 0., blue = 0.))
+#        self.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
+#        self.modify_bg(gtk.STATE_PRELIGHT, gtk.gdk.Color(red = 0., green = 0., blue = 1.))
+#        self.modify_bg(gtk.STATE_INSENSITIVE, gtk.gdk.Color(red = 0., green = 1., blue = 1.))
+
 
         iconView.set_pixbuf_column(COL_PIXBUF)
         iconView.set_selection_mode(gtk.SELECTION_SINGLE)
@@ -303,7 +312,13 @@ class TheTube(gtk.Window):
         cropped=pixbuf.subpixbuf(x,y,min(THUMBXSIZE,w-x),min(THUMBYSIZE,h-y))
         store.set(row, COL_PIXBUF, cropped)  
     
-    def set_store(self, search=None, page=1, ordering="relevance"):
+    def set_store(self, *args, **kwargs): #search=None, page=1, ordering="relevance"):
+        t=threading.Thread(target=self.set_store_background, args=args,kwargs=kwargs)
+        t.daemon=True
+        t.start()
+
+
+    def set_store_background(self, search=None, page=1, ordering="relevance"):
         store=self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
         self.ordering=ordering
         self.feed_mesg=store['message']
@@ -415,7 +430,7 @@ class TheTube(gtk.Window):
            t.start()
 
     def download(self,url,title):
-         self.message.set_text("busy downloading " + title[:60])
+         self.message.set_text("started downloading " + title[:60]) # have to think of something to track progress
          get_video_url(url,bandwidth=self.bandwidth,download_directory=self.download_directory)
          self.message.set_text("done downloading " + title[:60])
 
@@ -428,16 +443,14 @@ class TheTube(gtk.Window):
          if self.feed_mesg:
            self.message.set_text(self.feed_mesg)
  
-    def busy_message(self,arg):
-        ibusy=arg[1]
-        title=arg[0]
+    def busy_message(self,ibusy, message):
         ibusy+=1  
-        self.message.set_text("busy buffering "+title[:60]+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
         if self.playing:
-          gobject.timeout_add(1000, self.busy_message,(title,ibusy))
+          self.message.set_text(message+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
+          gobject.timeout_add(1000, self.busy_message,ibusy,message)
 
     def play(self,url,title):
-        gobject.timeout_add(1000, self.busy_message,(title,0))
+        gobject.timeout_add(1000, self.busy_message,0,"busy buffering "+title[:60])
         url=get_video_url(url,bandwidth=self.bandwidth,yt_dl=self.yt_dl)
         play_url(url,fullscreen=self.showfullscreen)
         self.message.set_text("stopped playing "+title)
@@ -447,8 +460,8 @@ class TheTube(gtk.Window):
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
 
     def on_help(self,widget=None):        
-        self.message.set_text("'h' = help, 's' = search, 'n' = next results, 'p' = previous results,"+
-           " 'o'= change order, 'enter' = play, 'q' = quit")
+        self.message.set_text("'h'=help, 's'=search, 'n, p'=next, previous results,"+
+           " 'o'=change order, 'enter'=play, 'd'=download, 'f'=set folder, 'q'=quit")
         gobject.timeout_add(5000, self.update_mesg)
 
     def on_key_press_event(self,widget, event):
@@ -479,6 +492,8 @@ class TheTube(gtk.Window):
           self.on_help()
         if keyname in ["d","D"]:
           self.on_download()
+        if keyname in ["f","F"]:
+          self.on_dir()
 
     def __del__(self):
         ts=threading.enumerate()
