@@ -16,13 +16,15 @@ fi
 OPTION1="run The Tube with preference for 360p"
 OPTION2="run The Tube with preference for 240p"
 OPTION3="update youtube-dl"
+OPTION4="(test) run The Tube with mplayer using omapfb (tvout)"
 
 SELECT=`zenity --list --width=360 --height=240 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
    FALSE "$OPTION2" \
-   FALSE "$OPTION3"`
+   FALSE "$OPTION3" \
+   FALSE "$OPTION4"`
 
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
@@ -32,6 +34,10 @@ fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
 python thetube.py -f -p -q
+fi
+if [ "$SELECT" == "$OPTION4" ]; then
+cd /mnt/utmp/thetube/bin/
+python thetube.py -f -p -m
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/

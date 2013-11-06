@@ -66,18 +66,19 @@ def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None, d
 
     return url
     
-def play_url(url, player="mplayer",novideo=False, fullscreen=False):
+def play_url(url, player="mplayer",novideo=False, fullscreen=False, omapfb=False):
     assert player in ["mplayer"]
     if player == "mplayer":
-        play_url_mplayer(url,novideo,fullscreen)
+        play_url_mplayer(url,novideo,fullscreen,omapfb)
     
-def play_url_mplayer(url,novideo=False,fullscreen=False):
+def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
     if novideo:
       player = subprocess.Popen(
             ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()])
     else:
       player = subprocess.Popen(
-            ['mplayer', '-quiet', '-fs' if fullscreen else ' ','--', url.decode('UTF-8').strip()])
+            ['mplayer', '-quiet', '-fs' if fullscreen else ' ',
+              '-vo omapfb' if omapfb else ' ','--', url.decode('UTF-8').strip()])
     atexit.register(kill_process,player)
     player.wait()
     print "playing done"
@@ -136,13 +137,14 @@ def standard_feed(feed_name="most_popular"):
     return feed
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,bandwidth=[5]):
+    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False,bandwidth=[5]):
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
         self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
         self.playing=False
         self.feed_mesg=""
         self.download_directory=os.getenv("HOME")+"/movie"
+        self.omapfb=omapfb
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -452,7 +454,7 @@ class TheTube(gtk.Window):
     def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,0,"busy buffering "+title[:60])
         url=get_video_url(url,bandwidth=self.bandwidth,yt_dl=self.yt_dl)
-        play_url(url,fullscreen=self.showfullscreen)
+        play_url(url,fullscreen=self.showfullscreen,omapfb=self.omapfb)
         self.message.set_text("stopped playing "+title)
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
@@ -507,6 +509,8 @@ def new_option_parser():
                       help="run fullscreen (recommend 800x480)",default=False)
     result.add_option("-p", action="store_true", dest="preload_ytdl",
                       help="preload youtube-dl",default=False)
+    result.add_option("-m", action="store_true", dest="omapfb",
+                      help="use omapfb in mplayer",default=False)
     result.add_option("-q", action="store_true", dest="low_quality",
                       help="prefer low quality (240p)",default=False)
     return result
@@ -519,5 +523,6 @@ if __name__=="__main__":
   else:
     BANDWIDTH=[18,36,5,17]
 
-  TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,bandwidth=BANDWIDTH)
+  TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
+    bandwidth=BANDWIDTH, omapfb=options.omapfb)
   gtk.main()
