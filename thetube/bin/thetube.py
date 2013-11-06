@@ -39,13 +39,17 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
-def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None):
+def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None, download_directory=None):
     
     if novideo and not preload: 
       bandwidth="5/18/43"
     
     if yt_dl is None:
-      call = "./youtube-dl -g -f " + bandwidth + " -a -"
+      if download_directory is not None:
+        call = "./youtube-dl --restrict-filenames -f " + bandwidth + \
+           " -o '"+download_directory+"/%(uploader)s_%(title)s.%(ext)s' -a -"
+      else:
+        call = "./youtube-dl -g -f " + bandwidth + " -a -"
       print call
       yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
         stdin=subprocess.PIPE, shell=True)
@@ -137,6 +141,7 @@ class TheTube(gtk.Window):
         self.preload_ytdl=preload_ytdl
         self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
         self.playing=False
+        self.download_directory=os.getenv("HOME")+"/movie"
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -189,6 +194,11 @@ class TheTube(gtk.Window):
         sortButton.add(image)
         toolbar.pack_start(sortButton,False,False,0)
 
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_DIRECTORY, gtk.ICON_SIZE_MENU)
+        dirButton = gtk.Button()
+        dirButton.add(image)
+        toolbar.pack_start(dirButton,False,False,0)
 
         image = gtk.Image()
         image.set_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_MENU)
@@ -202,7 +212,7 @@ class TheTube(gtk.Window):
         forwardButton.connect("clicked", self.on_forward)
         backButton.connect("clicked", self.on_back)
         sortButton.connect("clicked", self.on_order)
-
+        dirButton.connect("clicked", self.on_dir)        
 
         self.homeButton=homeButton
         self.exitButton=exitButton
@@ -260,6 +270,10 @@ class TheTube(gtk.Window):
         if self.preload_ytdl:
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
 
+        self.filechooser = gtk.FileChooserDialog('Select download directory', self.window, 
+                    gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Open', 2))
+        self.filechooser.set_current_folder(self.download_directory)
+ 
         self.show_all()
 
             
@@ -347,7 +361,14 @@ class TheTube(gtk.Window):
         
     def on_home(self, widget=None):
         self.set_store()
-    
+
+    def on_dir(self, widget=None):
+        ans=self.filechooser.run()
+        if ans == 2:      
+          self.download_directory=self.filechooser.get_filename()
+          print self.download_directory
+        self.filechooser.hide()
+        
     def on_forward(self,widget=None):
         search,page,ordering=self.current_key
         if self.store['last']<self.store['ntot']:    
@@ -381,9 +402,26 @@ class TheTube(gtk.Window):
         t.daemon=True
         t.start()
 
+    def on_download(self, widget=None):
+         items=self.iconView.get_selected_items()
+         if items:
+           item=items[0]
+           model = self.iconView.get_model()
+           title = model[item][COL_TITLE]
+           url = model[item][COL_ITEM]['player']['default']
+           print 'downloading ' + url
+           t=threading.Thread(target=self.download, args=(url,title))
+           t.daemon=True
+           t.start()
+
+    def download(self,url,title):
+         self.message.set_text("busy downloading " + title[:60])
+         get_video_url(url,bandwidth=self.bandwidth,download_directory=self.download_directory)
+         self.message.set_text("done downloading " + title[:60])
+
     def on_selection_changed(self, widget):
-         item=self.iconView.get_selected_items()[0]
-         model = self.iconView.get_model()
+         item=widget.get_selected_items()[0]
+         model = widget.get_model()
          self.message.set_text(model[item][COL_TOOLTIP])
 
     def update_mesg(self):
@@ -439,6 +477,8 @@ class TheTube(gtk.Window):
           gtk.main_quit()
         if keyname in ["h","H"]:
           self.on_help()
+        if keyname in ["d","D"]:
+          self.on_download()
 
     def __del__(self):
         ts=threading.enumerate()
