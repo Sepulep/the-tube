@@ -9,22 +9,24 @@ export HOME="/mnt/utmp/thetube"
 
 which mplayer
 if [ $? -ne 0 ]; then
-zenity --warning --text="mplayer not found - install codec pack"
+zenity --warning --text="mplayer not found - install the community codec pack"
 exit 1
 fi
 
 OPTION1="run The Tube with preference for 360p"
 OPTION2="run The Tube with preference for 240p"
-OPTION3="update youtube-dl"
-OPTION4="(test) run The Tube with mplayer using omapfb (tvout)"
+OPTION3="update youtube-dl (rarely necessary)"
+OPTION4="run The Tube for tvout, 360p (set HW layer)"
+OPTION5="run The Tube for tvout, 240p (set HW layer)"
 
-SELECT=`zenity --list --width=360 --height=240 \
+SELECT=`zenity --list --width=400 --height=300 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
    FALSE "$OPTION2" \
-   FALSE "$OPTION3" \
-   FALSE "$OPTION4"`
+   FALSE "$OPTION4" \
+   FALSE "$OPTION5" \
+   FALSE "$OPTION3"`
 
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
@@ -38,6 +40,10 @@ fi
 if [ "$SELECT" == "$OPTION4" ]; then
 cd /mnt/utmp/thetube/bin/
 python thetube.py -f -p -m
+fi
+if [ "$SELECT" == "$OPTION5" ]; then
+cd /mnt/utmp/thetube/bin/
+python thetube.py -f -p -m -q
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/
