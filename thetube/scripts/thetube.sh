@@ -15,9 +15,9 @@ fi
 
 OPTION1="run The Tube with preference for 360p"
 OPTION2="run The Tube with preference for 240p"
-OPTION3="update youtube-dl (rarely necessary)"
-OPTION4="run The Tube for tvout, 360p (set HW layer)"
-OPTION5="run The Tube for tvout, 240p (set HW layer)"
+OPTION3="update youtube-dl"
+OPTION4="run The Tube for tv-out, 360p (set HW layer)"
+OPTION5="run The Tube for tv-out, 240p (set HW layer)"
 
 SELECT=`zenity --list --width=400 --height=300 \
   --title="What do you want to run?" --radiolist \
