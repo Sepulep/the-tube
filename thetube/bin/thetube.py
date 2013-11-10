@@ -310,7 +310,7 @@ class TheTube(gtk.Window):
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
 
         self.filechooser = gtk.FileChooserDialog('Select download directory', self.window, 
-                    gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Open', 2))
+                    gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Select', 2))
         self.filechooser.set_current_folder(self.download_directory)
  
         self.show_all()
