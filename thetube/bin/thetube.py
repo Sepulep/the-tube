@@ -39,19 +39,12 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
-def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None, download_directory=None):
-    
-    if novideo and not preload: 
-      bandwidth="5/18/43"
-    
+def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None):
+
     if yt_dl is None:
-      if download_directory is not None:
-        call = "./youtube-dl --restrict-filenames -f " + bandwidth + \
-           " -o '"+download_directory+"/%(uploader)s_%(title)s.%(ext)s' -a -"
-      else:
-        call = "./youtube-dl -g -f " + bandwidth + " -a -"
+      call = "./youtube-dl -g -f " + bandwidth + " -a -"
       print call
-      yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE, stderr = subprocess.PIPE,
+      yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
         stdin=subprocess.PIPE, shell=True)
       atexit.register(kill_process,yt_dl)
 
@@ -59,12 +52,42 @@ def get_video_url(url="",novideo=False,bandwidth="5",preload=False,yt_dl=None, d
       return yt_dl
     
     (url, err) = yt_dl.communicate(input=url)
-        
     if yt_dl.returncode != 0:
       sys.stderr.write(err)
       raise RuntimeError('Error getting URL.')
 
     return url
+
+def download_video(url, download_directory, progressbar, bandwidth="5"):
+    
+    call = "./youtube-dl --newline --restrict-filenames -f " + bandwidth + \
+         " -o '"+download_directory+"/%(uploader)s_%(title)s.%(ext)s' -a -"
+    print call
+    yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
+      stdin=subprocess.PIPE, shell=True)
+    atexit.register(kill_process,yt_dl)
+    
+    yt_dl.stdin.write(url)
+    yt_dl.stdin.close()
+    out="1"
+    destination="destination file unknown"
+    while out:
+      out=yt_dl.stdout.readline()
+      if out.find("[download]")<0:
+        continue
+      if out.find("has already been downloaded")>=0:  
+        destination=out.split()[1]
+        return destination+" already exists"
+      if out.find("Destination")>=0:
+        destination=out.split()[2]
+        progressbar.set_text(destination)
+      else:
+        percent=float(out.split()[1][:-1])
+        progressbar.set_fraction(percent/100.)  
+    err=yt_dl.stderr.readlines()
+    yt_dl.wait()
+    print "end"
+    return "download finished: "+ destination
     
 def play_url(url, player="mplayer",novideo=False, fullscreen=False, omapfb=False):
     assert player in ["mplayer"]
@@ -164,6 +187,7 @@ class TheTube(gtk.Window):
           self.fullscreen()
           
         vbox = gtk.VBox(False, 0)
+        self.vbox = vbox
        
         toolbar = gtk.HBox()
         toolbar.set_size_request(780,34)
@@ -245,7 +269,7 @@ class TheTube(gtk.Window):
         message.set_size_request(780,20)
         message.modify_font(pango.FontDescription("sans 9"))
 
-        vbox.pack_start(message,False,False,0)
+        vbox.pack_end(message,False,False,0)
         self.message=message
         
         iconView = gtk.IconView()
@@ -434,11 +458,18 @@ class TheTube(gtk.Window):
            t=threading.Thread(target=self.download, args=(url,title))
            t.daemon=True
            t.start()
-
+         
     def download(self,url,title):
-         self.message.set_text("started downloading " + title[:60]) # have to think of something to track progress
-         get_video_url(url,bandwidth=self.bandwidth,download_directory=self.download_directory)
-         self.message.set_text("done downloading " + title[:60])
+#         self.message.set_text("started downloading " + title[:60]) # have to think of something to track progress
+         progressbar=gtk.ProgressBar()
+         progressbar.set_size_request(780,20)
+         progressbar.modify_font(pango.FontDescription("sans 7"))
+         progressbar.set_text("downloading " + title[:60])
+         self.vbox.pack_start(progressbar,False,False,0)
+         progressbar.show()
+         result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth)
+         progressbar.destroy()
+         self.message.set_text(result)
 
     def on_selection_changed(self, widget):
          item=widget.get_selected_items()[0]
