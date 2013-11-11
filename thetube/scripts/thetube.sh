@@ -13,19 +13,15 @@ zenity --warning --text="mplayer not found - install the community codec pack"
 exit 1
 fi
 
-OPTION1="run The Tube with preference for 360p"
-OPTION2="run The Tube with preference for 240p"
+OPTION1="run The Tube"
+OPTION2="run The Tube for tv-out (set HW layer)"
 OPTION3="update youtube-dl"
-OPTION4="run The Tube for tv-out, 360p (set HW layer)"
-OPTION5="run The Tube for tv-out, 240p (set HW layer)"
 
 SELECT=`zenity --list --width=400 --height=300 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
    FALSE "$OPTION2" \
-   FALSE "$OPTION4" \
-   FALSE "$OPTION5" \
    FALSE "$OPTION3"`
 
 echo $SELECT
@@ -35,15 +31,7 @@ python thetube.py -f -p
 fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -q
-fi
-if [ "$SELECT" == "$OPTION4" ]; then
-cd /mnt/utmp/thetube/bin/
 python thetube.py -f -p -m
-fi
-if [ "$SELECT" == "$OPTION5" ]; then
-cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -m -q
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/
