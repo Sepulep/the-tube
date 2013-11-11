@@ -29,6 +29,10 @@ THUMBYSIZE=90
 
 BANDWIDTH=[18,36,5,17]
 
+ENCODING480p=[35]
+ENCODING360p=[18]
+ENCODING240p=[36,5]
+
 NPERPAGE=24
 
 FULLSCREEN=False
@@ -167,7 +171,7 @@ class TheTube(gtk.Window):
     def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False,bandwidth=[5]):
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
-        self.bandwidth='/'.join(map(lambda x:str(x), bandwidth))
+        self.bandwidth=bandwidth
         self.playing=False
         self.feed_mesg=""
         self.download_directory=os.getenv("HOME")+"/movie"
@@ -250,6 +254,37 @@ class TheTube(gtk.Window):
         self.forwardButton=forwardButton
         self.backButton=backButton
 
+        button480=gtk.RadioButton(None,"480p")
+        button360=gtk.RadioButton(button480,"360p")
+        button240=gtk.RadioButton(button480,"240p")
+        buttontv=gtk.CheckButton("TV out")
+        
+        self.button480=button480
+        self.button360=button360
+        self.button240=button240
+        self.buttontv=buttontv
+                
+        button480.child.modify_font(pango.FontDescription("sans 9"))
+        button360.child.modify_font(pango.FontDescription("sans 9"))
+        button240.child.modify_font(pango.FontDescription("sans 9"))
+        buttontv.child.modify_font(pango.FontDescription("sans 9"))
+
+        self.buttontv.set_active(self.omapfb)
+        self.button240.set_active(bool( set(self.bandwidth) & set(ENCODING240p)))
+        self.button360.set_active(bool( set(self.bandwidth) & set(ENCODING360p))) 
+        self.button480.set_active(bool( set(self.bandwidth) & set(ENCODING480p)))
+
+                
+        button480.connect("toggled", self.on_res,"480p")
+        button360.connect("toggled", self.on_res,"360p")
+        button240.connect("toggled", self.on_res,"240p")
+        buttontv.connect("toggled", self.on_tv)
+        
+        toolbar.pack_end(buttontv,False,False,0)
+        toolbar.pack_end(button240,False,False,0)
+        toolbar.pack_end(button360,False,False,0)
+        toolbar.pack_end(button480,False,False,0)
+        
         entry = gtk.Entry(150)
         entry.modify_font(pango.FontDescription("sans 9"))
         entry.connect("activate", self.on_search, entry)
@@ -307,7 +342,7 @@ class TheTube(gtk.Window):
 
         self.yt_dl=None
         if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
 
         self.filechooser = gtk.FileChooserDialog('Select download directory', self.window, 
                     gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Select', 2))
@@ -399,6 +434,25 @@ class TheTube(gtk.Window):
         store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last)
                   
         return store
+    
+    def on_res(self,widget,res):
+        print "on_res",res
+        self.bandwidth=[]
+        button480=self.button480.get_active()
+        button360=self.button360.get_active()
+        button240=self.button240.get_active()
+        if button480: self.bandwidth.extend(ENCODING480p) 
+        if button360 or button480: self.bandwidth.extend(ENCODING360p) 
+        if button240 or button360 or button480: self.bandwidth.extend(ENCODING240p) 
+        self.bandwidth.extend([17])
+        print self.bandwidth_string()
+        if self.preload_ytdl:
+          if self.yt_dl:
+            self.yt_dl.terminate()
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
+
+    def on_tv(self,widget):
+        self.omapfb=not self.omapfb
         
     def on_search(self,widget,entry):
         self.set_store(search=entry.get_text(),ordering=self.orderings[0])
@@ -463,11 +517,11 @@ class TheTube(gtk.Window):
 #         self.message.set_text("started downloading " + title[:60]) # have to think of something to track progress
          progressbar=gtk.ProgressBar()
          progressbar.set_size_request(780,20)
-         progressbar.modify_font(pango.FontDescription("sans 7"))
+         progressbar.modify_font(pango.FontDescription("sans 9"))
          progressbar.set_text("downloading " + title[:60])
          self.vbox.pack_start(progressbar,False,False,0)
          progressbar.show()
-         result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth)
+         result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth_string())
          progressbar.destroy()
          self.message.set_text(result)
 
@@ -488,13 +542,13 @@ class TheTube(gtk.Window):
 
     def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,0,"busy buffering "+title[:60])
-        url=get_video_url(url,bandwidth=self.bandwidth,yt_dl=self.yt_dl)
+        url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
         play_url(url,fullscreen=self.showfullscreen,omapfb=self.omapfb)
         self.message.set_text("stopped playing "+title)
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth)
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
 
     def on_help(self,widget=None):        
         self.message.set_text("'h'=help, 's'=search, 'n, p'=next, previous results,"+
@@ -531,6 +585,17 @@ class TheTube(gtk.Window):
           self.on_download()
         if keyname in ["f","F"]:
           self.on_dir()
+        if keyname in ["2"]:
+          self.button240.set_active(not self.button240.get_active())
+        if keyname in ["3"]:
+          self.button360.set_active(not self.button360.get_active())
+        if keyname in ["4"]:
+          self.button480.set_active(not self.button480.get_active())
+        if keyname in ["t","T"]:
+          self.buttontv.set_active(not self.buttontv.get_active())
+
+    def bandwidth_string(self):
+        return '/'.join(map(lambda x:str(x), self.bandwidth))
 
     def __del__(self):
         ts=threading.enumerate()
