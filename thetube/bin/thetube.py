@@ -257,19 +257,19 @@ class TheTube(gtk.Window):
         button480=gtk.RadioButton(None,"480p")
         button360=gtk.RadioButton(button480,"360p")
         button240=gtk.RadioButton(button480,"240p")
-        buttontv=gtk.CheckButton("TV out")
+#        buttontv=gtk.CheckButton("TV out")
         
         self.button480=button480
         self.button360=button360
         self.button240=button240
-        self.buttontv=buttontv
+#        self.buttontv=buttontv
                 
         button480.child.modify_font(pango.FontDescription("sans 9"))
         button360.child.modify_font(pango.FontDescription("sans 9"))
         button240.child.modify_font(pango.FontDescription("sans 9"))
-        buttontv.child.modify_font(pango.FontDescription("sans 9"))
+#        buttontv.child.modify_font(pango.FontDescription("sans 9"))
 
-        self.buttontv.set_active(self.omapfb)
+#        self.buttontv.set_active(self.omapfb)
         self.button240.set_active(bool( set(self.bandwidth) & set(ENCODING240p)))
         self.button360.set_active(bool( set(self.bandwidth) & set(ENCODING360p))) 
         self.button480.set_active(bool( set(self.bandwidth) & set(ENCODING480p)))
@@ -278,9 +278,9 @@ class TheTube(gtk.Window):
         button480.connect("toggled", self.on_res,"480p")
         button360.connect("toggled", self.on_res,"360p")
         button240.connect("toggled", self.on_res,"240p")
-        buttontv.connect("toggled", self.on_tv)
+#        buttontv.connect("toggled", self.on_tv)
         
-        toolbar.pack_end(buttontv,False,False,0)
+#        toolbar.pack_end(buttontv,False,False,0)
         toolbar.pack_end(button240,False,False,0)
         toolbar.pack_end(button360,False,False,0)
         toolbar.pack_end(button480,False,False,0)
@@ -591,8 +591,8 @@ class TheTube(gtk.Window):
           self.button360.set_active(not self.button360.get_active())
         if keyname in ["4"]:
           self.button480.set_active(not self.button480.get_active())
-        if keyname in ["t","T"]:
-          self.buttontv.set_active(not self.buttontv.get_active())
+#        if keyname in ["t","T"]:
+#          self.buttontv.set_active(not self.buttontv.get_active())
 
     def bandwidth_string(self):
         return '/'.join(map(lambda x:str(x), self.bandwidth))
