@@ -39,6 +39,11 @@ FULLSCREEN=False
 
 PRELOAD_YTDL=True
 
+NSTRING=80
+
+def truncate(string,nstring=NSTRING):
+  return (string[:nstring] + '..') if len(string) > (nstring+2) else string
+
 def kill_process(x):
   if x.poll() is None:
     x.kill()
@@ -81,15 +86,18 @@ def download_video(url, download_directory, progressbar, bandwidth="5"):
         continue
       if out.find("has already been downloaded")>=0:  
         destination=out.split()[1]
-        return destination+" already exists"
+        return truncate(destination,NSTRING-17)+" already exists"
       if out.find("Destination")>=0:
         destination=out.split()[2]
-        progressbar.set_text(destination)
+        progressbar.set_text(truncate(destination))
       else:
         percent=float(out.split()[1][:-1])
         progressbar.set_fraction(percent/100.)  
     err=yt_dl.stderr.readlines()
     yt_dl.wait()
+    if yt_dl.returncode != 0:
+      sys.stderr.write(err)
+      raise RuntimeError('Error getting URL.')
     print "end"
     return "download finished: "+ destination
     
@@ -176,6 +184,7 @@ class TheTube(gtk.Window):
         self.feed_mesg=""
         self.download_directory=os.getenv("HOME")+"/movie"
         self.omapfb=omapfb
+        self.current_downloads=set()
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -436,7 +445,7 @@ class TheTube(gtk.Window):
         return store
     
     def on_res(self,widget,res):
-        print "on_res",res
+        prev=self.bandwidth
         self.bandwidth=[]
         button480=self.button480.get_active()
         button360=self.button360.get_active()
@@ -445,8 +454,7 @@ class TheTube(gtk.Window):
         if button360 or button480: self.bandwidth.extend(ENCODING360p) 
         if button240 or button360 or button480: self.bandwidth.extend(ENCODING240p) 
         self.bandwidth.extend([17])
-        print self.bandwidth_string()
-        if self.preload_ytdl:
+        if self.preload_ytdl and self.bandwidth!=prev:
           if self.yt_dl:
             self.yt_dl.terminate()
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
@@ -508,52 +516,59 @@ class TheTube(gtk.Window):
            model = self.iconView.get_model()
            title = model[item][COL_TITLE]
            url = model[item][COL_ITEM]['player']['default']
-           print 'downloading ' + url
-           t=threading.Thread(target=self.download, args=(url,title))
-           t.daemon=True
-           t.start()
+           if url not in self.current_downloads:
+             self.current_downloads.add(url)
+             print 'downloading ' + url
+             t=threading.Thread(target=self.download, args=(url,title))
+             t.daemon=True
+             t.start()
          
     def download(self,url,title):
-#         self.message.set_text("started downloading " + title[:60]) # have to think of something to track progress
          progressbar=gtk.ProgressBar()
          progressbar.set_size_request(780,20)
          progressbar.modify_font(pango.FontDescription("sans 9"))
-         progressbar.set_text("downloading " + title[:60])
+         progressbar.set_text(truncate("downloading " + title))
          self.vbox.pack_start(progressbar,False,False,0)
          progressbar.show()
-         result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth_string())
+         try:
+           result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth_string())
+           self.message.set_text(truncate(result))
+         except:
+           self.message.set_text("download "+truncate(title,NSTRING-16)+" failed")
          progressbar.destroy()
-         self.message.set_text(result)
+         self.current_downloads.remove(url)         
 
     def on_selection_changed(self, widget):
          item=widget.get_selected_items()[0]
          model = widget.get_model()
-         self.message.set_text(model[item][COL_TOOLTIP])
+         self.message.set_text(truncate(model[item][COL_TOOLTIP]))
 
     def update_mesg(self):
          if self.feed_mesg:
-           self.message.set_text(self.feed_mesg)
+           self.message.set_text(truncate(self.feed_mesg))
  
     def busy_message(self,ibusy, message):
         ibusy+=1  
         if self.playing:
-          self.message.set_text(message+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
+          self.message.set_text(truncate(message,NSTRING-4)+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
           gobject.timeout_add(1000, self.busy_message,ibusy,message)
 
     def play(self,url,title):
-        gobject.timeout_add(1000, self.busy_message,0,"busy buffering "+title[:60])
+        gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
         url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
         play_url(url,fullscreen=self.showfullscreen,omapfb=self.omapfb)
-        self.message.set_text("stopped playing "+title)
+        self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         if self.preload_ytdl:
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
 
     def on_help(self,widget=None):        
-        self.message.set_text("'h'=help, 's'=search, 'n, p'=next, previous results,"+
-           " 'o'=change order, 'enter'=play, 'd'=download, 'f'=set folder, 'q'=quit")
-        gobject.timeout_add(5000, self.update_mesg)
+        self.message.set_text("'h'=help, 's'=search, 'n'=next results, 'p'=previous results,"+
+          " 'o'=change order, 'enter'=play,")
+        gobject.timeout_add(4000, self.message.set_text,
+          "'2'= max 240p', '3'= max 360p, '4'= max 480p, 'd'=download, 'f'=set folder, 'q'=quit")   
+        gobject.timeout_add(7000, self.update_mesg)
 
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
