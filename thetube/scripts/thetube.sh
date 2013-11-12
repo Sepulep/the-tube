@@ -17,7 +17,7 @@ OPTION1="run The Tube"
 OPTION2="run The Tube for tv-out (set HW layer)"
 OPTION3="update youtube-dl"
 
-SELECT=`zenity --list --width=400 --height=300 \
+SELECT=`zenity --list --width=360 --height=240 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
