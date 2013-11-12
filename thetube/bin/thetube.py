@@ -39,7 +39,7 @@ FULLSCREEN=False
 
 PRELOAD_YTDL=True
 
-NSTRING=80
+NSTRING=110
 
 def truncate(string,nstring=NSTRING):
   return (string[:nstring] + '..') if len(string) > (nstring+2) else string
