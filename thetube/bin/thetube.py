@@ -27,8 +27,6 @@ COL_ORDER =4
 THUMBXSIZE=116
 THUMBYSIZE=90
 
-BANDWIDTH=[18,36,5,17]
-
 ENCODING480p=[35]
 ENCODING360p=[18]
 ENCODING240p=[36,5]
@@ -176,10 +174,10 @@ def standard_feed(feed_name="most_popular"):
     return feed
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False,bandwidth=[5]):
+    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False):
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
-        self.bandwidth=bandwidth
+        self.bandwidth="360p"
         self.playing=False
         self.feed_mesg=""
         self.download_directory=os.getenv("HOME")+"/movie"
@@ -279,11 +277,10 @@ class TheTube(gtk.Window):
 #        buttontv.child.modify_font(pango.FontDescription("sans 9"))
 
 #        self.buttontv.set_active(self.omapfb)
-        self.button240.set_active(bool( set(self.bandwidth) & set(ENCODING240p)))
-        self.button360.set_active(bool( set(self.bandwidth) & set(ENCODING360p))) 
-        self.button480.set_active(bool( set(self.bandwidth) & set(ENCODING480p)))
+        self.button240.set_active(self.bandwidth=="240p")
+        self.button360.set_active(self.bandwidth=="360p") 
+        self.button480.set_active(self.bandwidth=="480p")
 
-                
         button480.connect("toggled", self.on_res,"480p")
         button360.connect("toggled", self.on_res,"360p")
         button240.connect("toggled", self.on_res,"240p")
@@ -446,14 +443,9 @@ class TheTube(gtk.Window):
     
     def on_res(self,widget,res):
         prev=self.bandwidth
-        self.bandwidth=[]
-        button480=self.button480.get_active()
-        button360=self.button360.get_active()
-        button240=self.button240.get_active()
-        if button480: self.bandwidth.extend(ENCODING480p) 
-        if button360 or button480: self.bandwidth.extend(ENCODING360p) 
-        if button240 or button360 or button480: self.bandwidth.extend(ENCODING240p) 
-        self.bandwidth.extend([17])
+        if self.button480.get_active(): self.bandwidth="480p"
+        if self.button360.get_active(): self.bandwidth="360p"
+        if self.button240.get_active(): self.bandwidth="240p"
         if self.preload_ytdl and self.bandwidth!=prev:
           if self.yt_dl:
             self.yt_dl.terminate()
@@ -610,7 +602,12 @@ class TheTube(gtk.Window):
 #          self.buttontv.set_active(not self.buttontv.get_active())
 
     def bandwidth_string(self):
-        return '/'.join(map(lambda x:str(x), self.bandwidth))
+        bw_list=[]
+        if self.bandwidth in ["480p"]: bw_list.extend(ENCODING480p) 
+        if self.bandwidth in ["480p","360p"]: bw_list.extend(ENCODING360p) 
+        if self.bandwidth in ["480p","360p","240p"]: bw_list.extend(ENCODING240p) 
+        bw_list.extend([17])
+        return '/'.join(map(lambda x:str(x), bw_list))
 
     def __del__(self):
         ts=threading.enumerate()
@@ -626,18 +623,12 @@ def new_option_parser():
                       help="preload youtube-dl",default=False)
     result.add_option("-m", action="store_true", dest="omapfb",
                       help="use omapfb in mplayer",default=False)
-    result.add_option("-q", action="store_true", dest="low_quality",
-                      help="prefer low quality (240p)",default=False)
     return result
 
 if __name__=="__main__":
   (options, args) = new_option_parser().parse_args()  
   print options
-  if options.low_quality:
-    BANDWIDTH=[5,17,18,36]
-  else:
-    BANDWIDTH=[18,36,5,17]
 
   TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
-    bandwidth=BANDWIDTH, omapfb=options.omapfb)
+    omapfb=options.omapfb)
   gtk.main()
