@@ -175,12 +175,13 @@ def standard_feed(feed_name="most_popular"):
 
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False):
+        config=self.read_config()
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
-        self.bandwidth="360p"
+        self.bandwidth=config.setdefault("bandwidth","360p")
         self.playing=False
         self.feed_mesg=""
-        self.download_directory=os.getenv("HOME")+"/movie"
+        self.download_directory=config.setdefault("download_directory",os.getenv("HOME")+"/movie")
         self.omapfb=omapfb
         self.current_downloads=set()
 
@@ -192,7 +193,7 @@ class TheTube(gtk.Window):
         self.set_size_request(800, 480)
         self.set_position(gtk.WIN_POS_CENTER)
         
-        self.connect("destroy", gtk.main_quit)
+        self.connect("destroy", self.on_quit)
         self.set_title("The Tube")
         if self.showfullscreen:
           self.fullscreen()
@@ -585,7 +586,7 @@ class TheTube(gtk.Window):
         if keyname in ["o","O"]:
           self.on_order()
         if keyname in ["Q","q","Escape"]:
-          gtk.main_quit()
+          self.on_quit()
         if keyname in ["h","H"]:
           self.on_help()
         if keyname in ["d","D"]:
@@ -609,12 +610,31 @@ class TheTube(gtk.Window):
         bw_list.extend([17])
         return '/'.join(map(lambda x:str(x), bw_list))
 
-    def __del__(self):
+    def read_config(self):
+        try:
+          f=open(os.getenv("HOME")+"/.thetube","r")
+          config=json.load(f)
+          f.close()
+        except:
+          config=dict()
+        return config    
+          
+    def write_config(self,config):
+          print config, os.getenv("HOME")+"/.thetube"
+          f=open(os.getenv("HOME")+"/.thetube","w")
+          config=json.dump(config,f,indent=4)
+          f.close()
+          
+    def on_quit(self):
+        config=dict(download_directory=self.download_directory,
+                          bandwidth=self.bandwidth)      
+        self.write_config(config)
         ts=threading.enumerate()
         for t in ts[1:]:
           if t.isAlive():
             t._Thread__stop()
-
+        gtk.main_quit()
+        
 def new_option_parser():
     result = OptionParser(usage="usage: %prog [options]")
     result.add_option("-f", action="store_true", dest="fullscreen",
