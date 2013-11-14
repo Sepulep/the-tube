@@ -625,7 +625,7 @@ class TheTube(gtk.Window):
           config=json.dump(config,f,indent=4)
           f.close()
           
-    def on_quit(self):
+    def on_quit(self, widget=None):
         config=dict(download_directory=self.download_directory,
                           bandwidth=self.bandwidth)      
         self.write_config(config)
