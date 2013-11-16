@@ -14,6 +14,7 @@ import sys
 import datetime
 import atexit
 from optparse import OptionParser
+import operator
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -184,6 +185,7 @@ class TheTube(gtk.Window):
         self.download_directory=config.setdefault("download_directory",os.getenv("HOME")+"/movie")
         self.omapfb=omapfb
         self.current_downloads=set()
+        self.search_terms=config.setdefault("search_terms",dict())
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -294,9 +296,22 @@ class TheTube(gtk.Window):
         
         entry = gtk.Entry(150)
         entry.modify_font(pango.FontDescription("sans 9"))
-        entry.connect("activate", self.on_search, entry)
+
+        completion = gtk.EntryCompletion()
+        self.search_store = gtk.ListStore(str)
+        for s,i in self.search_terms.iteritems():
+            self.search_store.append([s])
+        completion.set_minimum_key_length(3)
+        completion.set_model(self.search_store)
+        completion.set_popup_completion(False)
+        completion.set_inline_completion(True)
+        entry.set_completion(completion)
+        completion.set_text_column(0)
+
+        entry.connect("activate", self.on_search)
         self.entry=entry
         toolbar.pack_end(entry,True,True,0)
+
 
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
         self.missing.fill(0x151515)
@@ -455,8 +470,15 @@ class TheTube(gtk.Window):
     def on_tv(self,widget):
         self.omapfb=not self.omapfb
         
-    def on_search(self,widget,entry):
-        self.set_store(search=entry.get_text(),ordering=self.orderings[0])
+    def on_search(self,widget):
+        text = widget.get_text()
+        if text:
+            if text not in self.search_terms.keys():
+                self.search_store.append([text])
+                self.search_terms[text]=0
+            else:
+                self.search_terms[text]=self.search_terms[text]+1      
+        self.set_store(search=text,ordering=self.orderings[0])
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
@@ -620,14 +642,14 @@ class TheTube(gtk.Window):
         return config    
           
     def write_config(self,config):
-          print config, os.getenv("HOME")+"/.thetube"
           f=open(os.getenv("HOME")+"/.thetube","w")
           config=json.dump(config,f,indent=4)
           f.close()
           
     def on_quit(self, widget=None):
+        search_terms=dict(sorted(self.search_terms.iteritems(), key=operator.itemgetter(1))[-100:])
         config=dict(download_directory=self.download_directory,
-                          bandwidth=self.bandwidth)      
+                          bandwidth=self.bandwidth,search_terms=search_terms)      
         self.write_config(config)
         ts=threading.enumerate()
         for t in ts[1:]:
