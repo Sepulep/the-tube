@@ -69,7 +69,7 @@ def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None):
 def download_video(url, download_directory, progressbar, bandwidth="5"):
     
     call = "./youtube-dl --newline --restrict-filenames -f " + bandwidth + \
-         " -o '"+download_directory+"/%(uploader)s_%(title)s.%(ext)s' -a -"
+         " -o '"+download_directory+"/%(uploader)s-%(title)s-%(id)s.%(ext)s' -a -"
     print call
     yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
       stdin=subprocess.PIPE, shell=True)
