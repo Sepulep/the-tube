@@ -732,7 +732,7 @@ class TheTube(gtk.Window):
           return True
         if keyname in ["n","N","Control_R"]:
           self.on_forward()
-        if keyname in ["p","P","Shift_L"]:
+        if keyname in ["p","P","Shift_R"]:
           self.on_back()
         if keyname in ["o","O"]:
           self.on_order()
