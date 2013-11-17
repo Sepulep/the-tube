@@ -613,8 +613,12 @@ class TheTube(gtk.Window):
             self.playlist.remove(model.get_iter(item))
             self.feed_mesg=self.playlist_message()
             self.update_mesg()
-           
-           
+
+    def on_clear(self):
+        self.playlist.clear()
+        self.feed_mesg=self.playlist_message()
+        self.update_mesg()
+
     def on_download(self, widget=None):
          items=self.iconView.get_selected_items()
          if items:
@@ -702,7 +706,7 @@ class TheTube(gtk.Window):
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
 
-    def on_help(self,widget=None):        
+    def on_help(self,widget=None):
         self.message.set_text("'h'=help, 's'=search, 'n'=next results, 'p'=previous results,"+
           " 'o'=change order, 'enter'=play,")
         gobject.timeout_add(4000, self.message.set_text,
@@ -751,7 +755,7 @@ class TheTube(gtk.Window):
         if keyname in ["l","L"]:
           self.on_list()
         if keyname in ["c","C"]:
-          self.playlist.clear()
+          self.on_clear()
         if keyname in ["2"]:
           self.button240.set_active(not self.button240.get_active())
         if keyname in ["3"]:
