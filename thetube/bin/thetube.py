@@ -15,6 +15,7 @@ import datetime
 import atexit
 from optparse import OptionParser
 import operator
+import time
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -62,7 +63,8 @@ def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None):
     (url, err) = yt_dl.communicate(input=url)
     if yt_dl.returncode != 0:
       sys.stderr.write(err)
-      raise RuntimeError('Error getting URL.')
+      return "FAIL"
+#      raise RuntimeError('Error getting URL.')
 
     return url
 
@@ -106,16 +108,23 @@ def play_url(url, player="mplayer",novideo=False, fullscreen=False, omapfb=False
         play_url_mplayer(url,novideo,fullscreen,omapfb)
     
 def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
+    
+    TMPFILE="/tmp/_mplayer_playlist"
+    
+    f=open(TMPFILE,"w")
+    for u in url:
+      f.write(u.decode('UTF-8').strip()+"\n")
+    f.close()  
+    
     if novideo:
-      call = ['mplayer', '-quiet', '-novideo', '--', url.decode('UTF-8').strip()]
+      call = ['mplayer', '-quiet', '-novideo', '-playlist', TMPFILE]
     else:
       call = ['mplayer', '-quiet']
       if fullscreen:
         call.extend(['-fs'])
       if omapfb:
         call.extend(['-vo','omapfb'])
-      call.append('--')
-      call.append(url.decode('UTF-8').strip())
+      call.extend(['-fixed-vo', '-playlist', TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()
@@ -312,7 +321,6 @@ class TheTube(gtk.Window):
         self.entry=entry
         toolbar.pack_end(entry,True,True,0)
 
-
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
         self.missing.fill(0x151515)
 
@@ -355,11 +363,12 @@ class TheTube(gtk.Window):
         self.add(vbox)
         
         self.stores=dict()
+        self.stores[("__playlist__",1,"")]=dict(store=self.create_store(),
+                        message=self.playlist_message, istart=1,ntot=0,last=0)
+        self.playlist=self.stores[("__playlist__",1,"")]['store']
+        self.playlist_clipboard=self.create_store()
         self.set_store()
-
-        self.message.set_text(" Welcome to The Tube!")
-        gobject.timeout_add(2000, self.on_help)
-
+        
         self.connect('key_press_event', self.on_key_press_event)
 
         self.yt_dl=None
@@ -372,10 +381,16 @@ class TheTube(gtk.Window):
  
         self.show_all()
 
+        time.sleep(0.2)
+        self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
+        gobject.timeout_add(3000, self.update_mesg)
+#        gobject.timeout_add(2000, self.on_help)
+
+
             
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
-        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
+#        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
         return store
             
     def pull_image(self,url,store,row):
@@ -408,7 +423,7 @@ class TheTube(gtk.Window):
     def set_store_background(self, search=None, page=1, ordering="relevance"):
         store=self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
         self.ordering=ordering
-        self.feed_mesg=store['message']
+        self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
         self.iconView.set_model(store['store'])
         self.store=store
@@ -444,6 +459,7 @@ class TheTube(gtk.Window):
   
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
+            item['mplayer_url']=None
             timestring=str(datetime.timedelta(seconds=item['duration']))
             tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
             row=store.append([item['title'], self.missing, item,tooltip,i])
@@ -517,13 +533,84 @@ class TheTube(gtk.Window):
         self.playing=True
 
         url = model[item][COL_ITEM]['player']['default']
+        mplayer_url=model[item][COL_ITEM]['mplayer_url']
         print 'Playing ' + url
-        
 
-        t=threading.Thread(target=self.play, args=(url,title))
+        t=threading.Thread(target=self.play, args=(url,title),kwargs=dict(mplayer_url=mplayer_url))
         t.daemon=True
         t.start()
 
+    def on_play_playlist(self, widget=None):
+        if self.playing or len(self.playlist)==0:
+           print "ignore"
+           return
+        self.playing=True
+       
+        print 'Playing playlist'
+
+        t=threading.Thread(target=self.play_playlist, args=(self.playlist,))
+        t.daemon=True
+        t.start()
+
+    def playlist_message(self):
+        if len(self.playlist)==0:
+          return "Playlist: empty"
+        else:
+          nitem=len(self.playlist)
+          time=0
+          for item in self.playlist:
+            time+=item[COL_ITEM]['duration']
+          timestring=str(datetime.timedelta(seconds=time))
+          return "Playlist: %i videos ["%nitem+timestring+"]"
+
+    def on_list(self):
+        if self.iconView.get_model()!=self.playlist:
+          self.prev_key=self.current_key
+          self.set_store('__playlist__',1,"")
+        else:
+          self.set_store(*self.prev_key)
+
+    def get_item_video_url(self, item):
+        item['mplayer_url']=get_video_url( item['player']['default'],bandwidth=self.bandwidth_string())
+        print item['mplayer_url']
+
+    def on_add(self,widget=None):
+        model = self.iconView.get_model()
+        if model!=self.playlist:
+          items=self.iconView.get_selected_items()
+          if items:
+            item=items[0]
+            model = self.iconView.get_model()
+            row=model[item]
+            self.playlist.append(row)
+            self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
+ 
+            t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
+            t.daemon=True
+            t.start()
+                       
+        elif model==self.playlist:
+          if len(self.playlist_clipboard):
+            items=self.iconView.get_selected_items()
+            if items:
+              item=items[0]
+              row=model[item]
+              self.playlist.insert_before(model.get_iter(item),row=self.playlist_clipboard[0])
+              self.playlist_clipboard.clear()
+              self.flash_message("pasted "+truncate(model[item][COL_TITLE],NSTRING-18)+" in playlist")          
+          
+    def on_remove(self,widget=None):
+        model = self.iconView.get_model()
+        if model==self.playlist:
+          items=self.iconView.get_selected_items()
+          if items:
+            item=items[0]
+            self.playlist_clipboard.clear()
+            self.playlist_clipboard.append(model[item])
+            self.flash_message("removed "+truncate(model[item][COL_TITLE],NSTRING-22)+" from playlist")
+            self.playlist.remove(model.get_iter(item))
+           
+           
     def on_download(self, widget=None):
          items=self.iconView.get_selected_items()
          if items:
@@ -554,13 +641,25 @@ class TheTube(gtk.Window):
          self.current_downloads.remove(url)         
 
     def on_selection_changed(self, widget):
-         item=widget.get_selected_items()[0]
-         model = widget.get_model()
-         self.message.set_text(truncate(model[item][COL_TOOLTIP]))
+         items=widget.get_selected_items()
+         if items:
+           item=items[0]
+           model = widget.get_model()
+           self.message.set_text(truncate(model[item][COL_TOOLTIP]))
 
-    def update_mesg(self):
-         if self.feed_mesg:
+    def flash_message(self,message):
+        old=self.message.get_text()
+        new=truncate(message)
+        self.message.set_text(new)
+        gobject.timeout_add(1000, self.update_mesg,old,new)
+      
+    def update_mesg(self,mesg=None,check=None):
+         if check is not None and self.message.get_text()!=check:
+           return
+         if self.feed_mesg and mesg is None:
            self.message.set_text(truncate(self.feed_mesg))
+         if mesg is not None:
+           self.message.set_text(truncate(mesg))
  
     def busy_message(self,ibusy, message):
         ibusy+=1  
@@ -568,15 +667,30 @@ class TheTube(gtk.Window):
           self.message.set_text(truncate(message,NSTRING-4)+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
           gobject.timeout_add(1000, self.busy_message,ibusy,message)
 
-    def play(self,url,title):
+    def play(self,url,title,mplayer_url=None):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
-        url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
-        play_url(url,fullscreen=self.showfullscreen,omapfb=self.omapfb)
+        if mplayer_url is None or mplayer_url=="FAIL": 
+          mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
+        play_url([mplayer_url],fullscreen=self.showfullscreen,omapfb=self.omapfb)
         self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         if self.preload_ytdl:
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
+
+    def play_playlist(self,playlist):
+        gobject.timeout_add(1000, self.busy_message,0,truncate("busy playing playlist"))
+        urllist=[]
+        for item in playlist:
+          if item[COL_ITEM]['mplayer_url'] is None or item[COL_ITEM]['mplayer_url'] is "FAIL":
+            url=get_video_url( item[COL_ITEM]['player']['default'],bandwidth=self.bandwidth_string())
+            item[COL_ITEM]['mplayer_url']=url
+          url=item[COL_ITEM]['mplayer_url']
+          urllist.append(url)
+        play_url(urllist,fullscreen=self.showfullscreen,omapfb=self.omapfb)
+        self.message.set_text(truncate("stopped playing playlist"))
+        self.playing=False
+        gobject.timeout_add(2000, self.update_mesg)
 
     def on_help(self,widget=None):        
         self.message.set_text("'h'=help, 's'=search, 'n'=next results, 'p'=previous results,"+
@@ -601,9 +715,12 @@ class TheTube(gtk.Window):
           self.update_mesg()
           self.entry.grab_focus()
           return True
-        if keyname in ["n","N"]:
+        if keyname in ["space"]:
+          self.on_play_playlist()
+          return True
+        if keyname in ["n","N","Control_R"]:
           self.on_forward()
-        if keyname in ["p","P"]:
+        if keyname in ["p","P","Shift_L"]:
           self.on_back()
         if keyname in ["o","O"]:
           self.on_order()
@@ -615,6 +732,12 @@ class TheTube(gtk.Window):
           self.on_download()
         if keyname in ["f","F"]:
           self.on_dir()
+        if keyname in ["a","A"]:
+          self.on_add()
+        if keyname in ["r","R"]:
+          self.on_remove()                    
+        if keyname in ["l","L"]:
+          self.on_list()
         if keyname in ["2"]:
           self.button240.set_active(not self.button240.get_active())
         if keyname in ["3"]:
