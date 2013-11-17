@@ -122,10 +122,10 @@ def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
       if fullscreen:
         call.extend(['-fs'])
       if omapfb:
-        call.extend(['-vo','omapfb'])
+        call.extend(['-vo','omapfb', '-fixed-vo'])
       else:
         call.extend(['-vo','xv'])
-      call.extend(['-fixed-vo', '-playlist', TMPFILE])  
+      call.extend(['-playlist', TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()
