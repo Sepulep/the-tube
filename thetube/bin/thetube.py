@@ -124,6 +124,8 @@ def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
         call.extend(['-fs'])
       if omapfb:
         call.extend(['-vo','omapfb'])
+      else:
+        call.extend(['-vo','xv'])
       call.extend(['-fixed-vo', '-playlist', TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
@@ -343,12 +345,14 @@ class TheTube(gtk.Window):
         iconView.set_columns(6)
         iconView.set_border_width(0)
         iconView.modify_base(gtk.STATE_NORMAL, gtk.gdk.Color("black"))
+        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color("light grey"))
         
+
 #        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 0., blue = 0.))
-#        self.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(red = 1., green = 0., blue = 0.))
-#        self.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
-#        self.modify_bg(gtk.STATE_PRELIGHT, gtk.gdk.Color(red = 0., green = 0., blue = 1.))
-#        self.modify_bg(gtk.STATE_INSENSITIVE, gtk.gdk.Color(red = 0., green = 1., blue = 1.))
+#        iconView.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(red = 1., green = 0., blue = 0.))
+#        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
+#        iconView.modify_bg(gtk.STATE_PRELIGHT, gtk.gdk.Color(red = 0., green = 0., blue = 1.))
+#        iconView.modify_bg(gtk.STATE_INSENSITIVE, gtk.gdk.Color(red = 0., green = 1., blue = 1.))
 
 
         iconView.set_pixbuf_column(COL_PIXBUF)
@@ -584,7 +588,8 @@ class TheTube(gtk.Window):
             row=model[item]
             self.playlist.append(row)
             self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
- 
+            self.flash_cursor()
+
             t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
             t.daemon=True
             t.start()
@@ -646,6 +651,12 @@ class TheTube(gtk.Window):
            item=items[0]
            model = widget.get_model()
            self.message.set_text(truncate(model[item][COL_TOOLTIP]))
+
+    def flash_cursor(self):
+        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
+        gobject.timeout_add(250, self.iconView.modify_bg,
+          gtk.STATE_SELECTED, gtk.gdk.Color("light grey"))
+
 
     def flash_message(self,message):
         old=self.message.get_text()
@@ -735,9 +746,11 @@ class TheTube(gtk.Window):
         if keyname in ["a","A"]:
           self.on_add()
         if keyname in ["r","R"]:
-          self.on_remove()                    
+          self.on_remove()
         if keyname in ["l","L"]:
           self.on_list()
+        if keyname in ["c","C"]:
+          self.playlist.clear()
         if keyname in ["2"]:
           self.button240.set_active(not self.button240.get_active())
         if keyname in ["3"]:
