@@ -15,7 +15,6 @@ import datetime
 import atexit
 from optparse import OptionParser
 import operator
-import time
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -385,9 +384,8 @@ class TheTube(gtk.Window):
  
         self.show_all()
 
-        time.sleep(0.2)
-        self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
-        gobject.timeout_add(3000, self.update_mesg)
+#        self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
+        gobject.timeout_add(1000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
 #        gobject.timeout_add(2000, self.on_help)
 
 
@@ -435,7 +433,7 @@ class TheTube(gtk.Window):
 
         self.backButton.set_sensitive(False if store['istart']==1 else True)    
         self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
-        self.iconView.set_cursor(0)
+        self.iconView.select_path(0)
     
     def fetch_store(self, search=None, page=1, ordering="relevance"):
 
@@ -612,8 +610,9 @@ class TheTube(gtk.Window):
             item=items[0]
             self.playlist_clipboard.clear()
             self.playlist_clipboard.append(model[item])
-            self.flash_message("removed "+truncate(model[item][COL_TITLE],NSTRING-22)+" from playlist")
             self.playlist.remove(model.get_iter(item))
+            self.feed_mesg=self.playlist_message()
+            self.update_mesg()
            
            
     def on_download(self, widget=None):
@@ -662,7 +661,7 @@ class TheTube(gtk.Window):
         old=self.message.get_text()
         new=truncate(message)
         self.message.set_text(new)
-        gobject.timeout_add(1000, self.update_mesg,old,new)
+        gobject.timeout_add(2000, self.update_mesg,old,new)
       
     def update_mesg(self,mesg=None,check=None):
          if check is not None and self.message.get_text()!=check:
@@ -707,8 +706,10 @@ class TheTube(gtk.Window):
         self.message.set_text("'h'=help, 's'=search, 'n'=next results, 'p'=previous results,"+
           " 'o'=change order, 'enter'=play,")
         gobject.timeout_add(4000, self.message.set_text,
-          "'2'= max 240p', '3'= max 360p, '4'= max 480p, 'd'=download, 'f'=set folder, 'q'=quit")   
-        gobject.timeout_add(7000, self.update_mesg)
+          "'2'=max 240p', '3'=max 360p, '4'=max 480p, 'd'=download, 'f'=set download folder, 'q'=quit,")   
+        gobject.timeout_add(8000, self.message.set_text,
+          "playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play")
+        gobject.timeout_add(12000, self.update_mesg)
 
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
