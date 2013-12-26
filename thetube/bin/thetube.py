@@ -273,6 +273,9 @@ class TheTube(gtk.Window):
         self.exitButton=exitButton
         self.forwardButton=forwardButton
         self.backButton=backButton
+        self.helpButton=helpButton
+        self.sortButton=sortButton
+        self.dirButton=dirButton
 
         button480=gtk.RadioButton(None,"480p")
         button360=gtk.RadioButton(button480,"360p")
@@ -303,6 +306,14 @@ class TheTube(gtk.Window):
         toolbar.pack_end(button240,False,False,0)
         toolbar.pack_end(button360,False,False,0)
         toolbar.pack_end(button480,False,False,0)
+
+        playlistButton = gtk.Button()
+        playlistButton.set_size_request(28,32)
+        playlistButton.set_label("0")
+        playlistButton.connect("clicked", self.on_list)        
+        toolbar.pack_end(playlistButton,False,False,0)
+        self.playlistButton=playlistButton
+
         
         entry = gtk.Entry(150)
         entry.modify_font(pango.FontDescription("sans 9"))
@@ -531,14 +542,17 @@ class TheTube(gtk.Window):
 
         if self.playing:
            print "ignore"
+           self.flash_cursor("red")
            return
+        self.flash_cursor("green")
         self.playing=True
 
         url = model[item][COL_ITEM]['player']['default']
-        mplayer_url=model[item][COL_ITEM]['mplayer_url']
+#        mplayer_url=model[item][COL_ITEM]['mplayer_url']
+        item=model[item][COL_ITEM]
         print 'Playing ' + url
 
-        t=threading.Thread(target=self.play, args=(url,title),kwargs=dict(mplayer_url=mplayer_url))
+        t=threading.Thread(target=self.play, args=(url,title),kwargs=dict(item=item))
         t.daemon=True
         t.start()
 
@@ -565,7 +579,7 @@ class TheTube(gtk.Window):
           timestring=str(datetime.timedelta(seconds=time))
           return "Playlist: %i videos ["%nitem+timestring+"]"
 
-    def on_list(self):
+    def on_list(self, widget=None):
         if self.iconView.get_model()!=self.playlist:
           self.prev_key=self.current_key
           self.set_store('__playlist__',1,"")
@@ -575,6 +589,9 @@ class TheTube(gtk.Window):
     def get_item_video_url(self, item):
         item['mplayer_url']=get_video_url( item['player']['default'],bandwidth=self.bandwidth_string())
         print item['mplayer_url']
+
+    def set_playlist_label(self):
+        self.playlistButton.set_label(str(len(self.playlist)))
 
     def on_add(self,widget=None):
         model = self.iconView.get_model()
@@ -586,7 +603,8 @@ class TheTube(gtk.Window):
             row=model[item]
             self.playlist.append(row)
             self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
-            self.flash_cursor()
+            self.flash_cursor("blue")
+
 
             t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
             t.daemon=True
@@ -601,6 +619,8 @@ class TheTube(gtk.Window):
               self.playlist.insert_before(model.get_iter(item),row=self.playlist_clipboard[0])
               self.playlist_clipboard.clear()
               self.flash_message("pasted "+truncate(model[item][COL_TITLE],NSTRING-18)+" in playlist")          
+        self.set_playlist_label()
+
           
     def on_remove(self,widget=None):
         model = self.iconView.get_model()
@@ -613,9 +633,11 @@ class TheTube(gtk.Window):
             self.playlist.remove(model.get_iter(item))
             self.feed_mesg=self.playlist_message()
             self.update_mesg()
+        self.set_playlist_label()
 
     def on_clear(self):
         self.playlist.clear()
+        self.set_playlist_label()
         self.feed_mesg=self.playlist_message()
         self.update_mesg()
 
@@ -655,8 +677,8 @@ class TheTube(gtk.Window):
            model = widget.get_model()
            self.message.set_text(truncate(model[item][COL_TOOLTIP]))
 
-    def flash_cursor(self):
-        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
+    def flash_cursor(self,color="green"):
+        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(color))
         gobject.timeout_add(250, self.iconView.modify_bg,
           gtk.STATE_SELECTED, gtk.gdk.Color("light grey"))
 
@@ -681,10 +703,16 @@ class TheTube(gtk.Window):
           self.message.set_text(truncate(message,NSTRING-4)+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
           gobject.timeout_add(1000, self.busy_message,ibusy,message)
 
-    def play(self,url,title,mplayer_url=None):
+    def play(self,url,title,item=None):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
+        if item is not None:
+          mplayer_url=item['mplayer_url']
+        else
+          mplayer_url=None
         if mplayer_url is None or mplayer_url=="FAIL": 
           mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
+          if item is not None:
+            item['mplayer_url']=mplayer_url
         play_url([mplayer_url],fullscreen=self.showfullscreen,omapfb=self.omapfb)
         self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
@@ -722,9 +750,9 @@ class TheTube(gtk.Window):
           self.iconView.grab_focus()
           return True
         if keyname in ["Page_Down"]:
-          self.on_forward()
+          self.forwardButton.emit("activate")
         if keyname in ["Page_Up"]:
-          self.on_back()
+          self.backButton.emit("activate")
         if self.entry.is_focus():
           return False
         if keyname in ["s","S"]:
@@ -735,25 +763,25 @@ class TheTube(gtk.Window):
           self.on_play_playlist()
           return True
         if keyname in ["n","N","Control_R"]:
-          self.on_forward()
+          self.forwardButton.emit("activate")
         if keyname in ["p","P","Shift_R"]:
-          self.on_back()
+          self.backButton.emit("activate")
         if keyname in ["o","O"]:
-          self.on_order()
+          self.sortButton.emit("activate")
         if keyname in ["Q","q","Escape"]:
-          self.on_quit()
+          self.exitButton.emit("activate")
         if keyname in ["h","H"]:
-          self.on_help()
+          self.helpButton.emit("activate")
         if keyname in ["d","D"]:
           self.on_download()
         if keyname in ["f","F"]:
-          self.on_dir()
+          self.dirButton.emit("activate")
         if keyname in ["a","A"]:
           self.on_add()
         if keyname in ["r","R"]:
           self.on_remove()
         if keyname in ["l","L"]:
-          self.on_list()
+          self.playlistButton.emit("activate")
         if keyname in ["c","C"]:
           self.on_clear()
         if keyname in ["2"]:
