@@ -263,7 +263,7 @@ class TheTube(gtk.Window):
 
         helpButton.connect("clicked", self.on_help)
         homeButton.connect("clicked", self.on_home)
-        exitButton.connect("clicked", gtk.main_quit)
+        exitButton.connect("clicked", self.on_quit)
         forwardButton.connect("clicked", self.on_forward)
         backButton.connect("clicked", self.on_back)
         sortButton.connect("clicked", self.on_order)
@@ -302,11 +302,6 @@ class TheTube(gtk.Window):
         button240.connect("toggled", self.on_res,"240p")
 #        buttontv.connect("toggled", self.on_tv)
         
-#        toolbar.pack_end(buttontv,False,False,0)
-        toolbar.pack_end(button240,False,False,0)
-        toolbar.pack_end(button360,False,False,0)
-        toolbar.pack_end(button480,False,False,0)
-
         playlistButton = gtk.Button()
         playlistButton.set_size_request(28,32)
         playlistButton.set_label("0")
@@ -314,6 +309,10 @@ class TheTube(gtk.Window):
         toolbar.pack_end(playlistButton,False,False,0)
         self.playlistButton=playlistButton
 
+#        toolbar.pack_end(buttontv,False,False,0)
+        toolbar.pack_end(button240,False,False,0)
+        toolbar.pack_end(button360,False,False,0)
+        toolbar.pack_end(button480,False,False,0)
         
         entry = gtk.Entry(150)
         entry.modify_font(pango.FontDescription("sans 9"))
@@ -395,12 +394,10 @@ class TheTube(gtk.Window):
  
         self.show_all()
 
-#        self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
-        gobject.timeout_add(1000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
+        self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
+#        gobject.timeout_add(4000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
 #        gobject.timeout_add(2000, self.on_help)
 
-
-            
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
 #        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
@@ -444,7 +441,7 @@ class TheTube(gtk.Window):
 
         self.backButton.set_sensitive(False if store['istart']==1 else True)    
         self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
-        self.iconView.select_path(0)
+#        self.iconView.select_path(0)
     
     def fetch_store(self, search=None, page=1, ordering="relevance"):
 
@@ -707,7 +704,7 @@ class TheTube(gtk.Window):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
         if item is not None:
           mplayer_url=item['mplayer_url']
-        else
+        else:
           mplayer_url=None
         if mplayer_url is None or mplayer_url=="FAIL": 
           mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
