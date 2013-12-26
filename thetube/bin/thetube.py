@@ -306,7 +306,7 @@ class TheTube(gtk.Window):
         playlistButton.set_size_request(28,32)
         playlistButton.set_label("0")
         playlistButton.connect("clicked", self.on_list)        
-        toolbar.pack_end(playlistButton,False,False,0)
+        toolbar.pack_start(playlistButton,False,False,0)
         self.playlistButton=playlistButton
 
 #        toolbar.pack_end(buttontv,False,False,0)
