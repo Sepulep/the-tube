@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+import time 
+import random
 import gtk
 import pango
 import os
@@ -184,6 +186,27 @@ def standard_feed(feed_name="most_popular"):
 
     return feed
 
+def single_video_data(videoid):
+    def fetch_cb():
+        url = "https://gdata.youtube.com/feeds/api/videos/"+videoid
+        query = {
+            'v': 2,
+            'alt': 'jsonc'            
+        }
+        try:
+          sock=None
+          sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+          result=json.load(sock)
+        except Exception as ex:
+          result=dict(data=dict())
+        finally:  
+          if sock:
+            sock.close()
+        return result
+
+    return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,) }
+
+
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False):
         config=self.read_config()
@@ -337,15 +360,22 @@ class TheTube(gtk.Window):
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
-        sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_NEVER)
-        vbox.pack_start(sw, True, True, 0)
+        sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
+#        vbox.pack_start(sw, True, True, 0)
+
+        self.infoView=gtk.TextView()
+        self.infoView.set_buffer(gtk.TextBuffer())
+        self.infoView.set_size_request(780,100)
+        self.infoView.modify_font(pango.FontDescription("sans 8"))
+        self.infoView.set_wrap_mode(gtk.WRAP_WORD)
+        sw.set_no_show_all(True)
+        self.infoView_sw=sw
 
         message=gtk.Label(" ")
         message.set_single_line_mode(True)
         message.set_size_request(780,20)
         message.modify_font(pango.FontDescription("sans 9"))
 
-        vbox.pack_end(message,False,False,0)
         self.message=message
         
         iconView = gtk.IconView()
@@ -369,9 +399,15 @@ class TheTube(gtk.Window):
 
         iconView.connect("item-activated", self.on_item_activated)
         iconView.connect("selection-changed", self.on_selection_changed)
-        sw.add(iconView)
         iconView.grab_focus()
         self.iconView=iconView
+
+        self.infoView_sw.add(self.infoView)
+        
+        self.vbox.pack_start(iconView, True, True, 0)
+        self.vbox.pack_end(sw,False,False,0)
+        self.vbox.pack_end(message,False,False,0)
+
 
         self.add(vbox)
         
@@ -380,7 +416,7 @@ class TheTube(gtk.Window):
                         message=self.playlist_message, istart=1,ntot=0,last=0)
         self.playlist=self.stores[("__playlist__",1,"")]['store']
         self.playlist_clipboard=self.create_store()
-        self.set_store()
+        self.set_store("Openpandora",1,"relevance")
         
         self.connect('key_press_event', self.on_key_press_event)
 
@@ -404,14 +440,23 @@ class TheTube(gtk.Window):
         return store
             
     def pull_image(self,url,store,row):
-        try:
-          a=urllib.urlopen(url)
-          s=StringIO(a.read())
-        except:
-          print "pull image fail"
-        finally:
-          if a:
-            a.close()  
+        time.sleep(3*random.random())
+        a=None
+        retry=0
+        while True:
+          try:
+            a=urllib.urlopen(url)
+            s=StringIO(a.read())
+          except Exception as ex:
+            if a: a.close()  
+            if retry>3:
+              print ex
+              print "pull image fail"
+              return
+            retry+=1
+          else:
+            a.close()
+            break            
         contents = s.getvalue()
         loader = gtk.gdk.PixbufLoader()  
         loader.write(contents, len(contents))  
@@ -423,6 +468,15 @@ class TheTube(gtk.Window):
         y=max(0,(h-THUMBYSIZE)/2+1)
         cropped=pixbuf.subpixbuf(x,y,min(THUMBXSIZE,w-x),min(THUMBYSIZE,h-y))
         store.set(row, COL_PIXBUF, cropped)  
+
+    def pull_description(self,item):
+        time.sleep(3*random.random())
+        f=single_video_data(item['id'])['fetch_cb']
+        data=f()['data']
+        if data.has_key('description'):
+          item['description']=data['description']
+        else:
+          print data  
     
     def set_store(self, *args, **kwargs): #search=None, page=1, ordering="relevance"):
         t=threading.Thread(target=self.set_store_background, args=args,kwargs=kwargs)
@@ -476,6 +530,11 @@ class TheTube(gtk.Window):
             t=threading.Thread(target=self.pull_image, args=(url,store,row))
             t.daemon=True
             t.start()
+
+            t=threading.Thread(target=self.pull_description, args=(item,))
+            t.daemon=True
+            t.start()
+
         else:
           message=feed['description']+": no results"
           
@@ -508,7 +567,7 @@ class TheTube(gtk.Window):
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
-        self.set_store()
+        self.set_store("Openpandora",1,"relevance")
 
     def on_dir(self, widget=None):
         ans=self.filechooser.run()
@@ -673,6 +732,7 @@ class TheTube(gtk.Window):
            item=items[0]
            model = widget.get_model()
            self.message.set_text(truncate(model[item][COL_TOOLTIP]))
+           self.infoView.get_buffer().set_text(model[item][COL_ITEM]['description'])
 
     def flash_cursor(self,color="green"):
         self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(color))
@@ -740,6 +800,17 @@ class TheTube(gtk.Window):
           "playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play")
         gobject.timeout_add(12000, self.update_mesg)
 
+    def on_info(self,widget=None):
+      if self.infoView_sw.flags() & gtk.MAPPED:
+        self.infoView.hide()
+        self.infoView_sw.hide()
+      else:  
+        self.infoView_sw.show()
+        self.infoView.show()
+        items=self.iconView.get_selected_items()
+        if items:
+           self.iconView.scroll_to_path(items[0],False,0.,0.)
+                    
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
 #        print "Key %s (%d) was pressed" % (keyname, event.keyval)
@@ -781,6 +852,8 @@ class TheTube(gtk.Window):
           self.playlistButton.emit("activate")
         if keyname in ["c","C"]:
           self.on_clear()
+        if keyname in ["i","I"]:
+          self.on_info()          
         if keyname in ["2"]:
           self.button240.set_active(not self.button240.get_active())
         if keyname in ["3"]:
@@ -837,6 +910,6 @@ if __name__=="__main__":
   (options, args) = new_option_parser().parse_args()  
   print options
 
-  TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
+  application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
     omapfb=options.omapfb)
   gtk.main()
