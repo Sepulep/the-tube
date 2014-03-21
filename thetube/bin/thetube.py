@@ -103,10 +103,12 @@ def download_video(url, download_directory, progressbar, bandwidth="5"):
     print "end"
     return "download finished: "+ destination
     
-def play_url(url, player="mplayer",novideo=False, fullscreen=False, omapfb=False):
-    assert player in ["mplayer"]
+def play_url(url, player="mpv",novideo=False, fullscreen=False, omapfb=False):
+    assert player in ["mplayer","mpv"]
     if player == "mplayer":
         play_url_mplayer(url,novideo,fullscreen,omapfb)
+    if player == "mpv":
+        play_url_mpv(url,novideo,fullscreen,omapfb)
     
 def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
     
@@ -128,6 +130,32 @@ def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
       else:
         call.extend(['-vo','xv'])
       call.extend(['-playlist', TMPFILE])  
+    player = subprocess.Popen(call)
+    atexit.register(kill_process,player)
+    player.wait()
+    print "playing done"
+
+def play_url_mpv(url,novideo=False,fullscreen=False, omapfb=False):
+    
+    TMPFILE="/tmp/_mplayer_playlist"
+    
+    f=open(TMPFILE,"w")
+    for u in url:
+      f.write(u.decode('UTF-8').strip()+"\n")
+    f.close()  
+    
+    if novideo:
+      call = ['mpv', '--quiet', '-no-video', '--playlist='+TMPFILE]
+    else:
+      call = ['mpv', '--quiet']
+      if fullscreen:
+        call.extend(['--fs'])
+      if omapfb:
+#        call.extend(['-vo','omapfb', '-fixed-vo'])
+        call.extend(['--vo','xv'])
+      else:
+        call.extend(['--vo','xv'])
+      call.extend(['--playlist='+TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()

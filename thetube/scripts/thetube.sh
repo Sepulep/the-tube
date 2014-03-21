@@ -4,6 +4,7 @@ export LD_LIBRARY_PATH=":${LD_LIBRARY_PATH:-"/usr/lib:/lib"}"
 export HOME="/mnt/utmp/thetube" XDG_CONFIG_HOME="/mnt/utmp/thetube"
 
 export PATH=$PATH:/mnt/utmp/thetube/bin
+export LD_LIBRARY_PATH=/mnt/utmp/thetube/lib:$LD_LIBRARY_PATH
 
 export HOME="/mnt/utmp/thetube"
 
