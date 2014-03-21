@@ -1,5 +1,13 @@
 #!/usr/bin/python
 
+DOCSTRING="""
+General keyboard shortcuts:
+      'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
+      '2'=max 240p', '3'=max 360p, '4'=max 480p, 'd'=download, 'f'=set download folder, 'q'=quit
+Playlist commands: 
+      'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
+"""
+
 import time 
 import random
 import gtk
@@ -820,13 +828,8 @@ class TheTube(gtk.Window):
         gobject.timeout_add(2000, self.update_mesg)
 
     def on_help(self,widget=None):
-        self.message.set_text("'h'=help, 's'=search, 'n'=next results, 'p'=previous results,"+
-          " 'o'=change order, 'enter'=play,")
-        gobject.timeout_add(4000, self.message.set_text,
-          "'2'=max 240p', '3'=max 360p, '4'=max 480p, 'd'=download, 'f'=set download folder, 'q'=quit,")   
-        gobject.timeout_add(8000, self.message.set_text,
-          "playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play")
-        gobject.timeout_add(12000, self.update_mesg)
+        self.infoView.get_buffer().set_text(DOCSTRING)
+        self.on_info()
 
     def on_info(self,widget=None):
       if self.infoView_sw.flags() & gtk.MAPPED:
