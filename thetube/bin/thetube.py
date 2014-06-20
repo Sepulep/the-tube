@@ -244,7 +244,7 @@ def single_video_data(videoid):
 
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False, video player='mplayer'):
+    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False, video_player='mplayer'):
         config=self.read_config()
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl

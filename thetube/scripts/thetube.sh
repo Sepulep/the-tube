@@ -21,7 +21,7 @@ OPTION2="run The Tube for tv-out (mplayer, set HW layer)"
 OPTION3="update youtube-dl"
 OPTION4="revert youtube-dl to pnd version"
 
-SELECT=`zenity --list --width=360 --height=240 \
+SELECT=`zenity --list --width=360 --height=280 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
