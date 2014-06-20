@@ -160,9 +160,9 @@ def play_url_mpv(url,novideo=False,fullscreen=False, omapfb=False):
         call.extend(['--fs'])
       if omapfb:
 #        call.extend(['-vo','omapfb', '-fixed-vo'])
-        call.extend(['--vo','xv'])
+        call.extend(['--vo','xv','--fixed-vo'])
       else:
-        call.extend(['--vo','xv'])
+        call.extend(['--vo','xv','--no-fixed-vo'])
       call.extend(['--playlist='+TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)

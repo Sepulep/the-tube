@@ -8,6 +8,8 @@ export LD_LIBRARY_PATH=/mnt/utmp/thetube/lib:$LD_LIBRARY_PATH
 
 export HOME="/mnt/utmp/thetube"
 
+ldd /mnt/utmp/thetube/bin/mpv
+
 which mplayer
 if [ $? -ne 0 ]; then
 zenity --warning --text="mplayer not found - install the community codec pack"
@@ -23,9 +25,9 @@ SELECT=`zenity --list --width=360 --height=240 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
-   FALSE "$OPTION2" \
    FALSE "$OPTION3" \
    FALSE "$OPTION4"`
+#   FALSE "$OPTION2" \
 
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
