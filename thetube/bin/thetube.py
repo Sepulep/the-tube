@@ -57,10 +57,11 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
-def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None):
+def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None, use_http=True):
 
     if yt_dl is None:
-      call = "./youtube-dl -g -f " + bandwidth + " -a -"
+      security='' if not use_http else '--prefer-insecure'
+      call = "./youtube-dl -g -f " + bandwidth + " " + security + " -a -"
       print call
       yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
         stdin=subprocess.PIPE, shell=True)
@@ -159,8 +160,7 @@ def play_url_mpv(url,novideo=False,fullscreen=False, omapfb=False):
       if fullscreen:
         call.extend(['--fs'])
       if omapfb:
-#        call.extend(['-vo','omapfb', '-fixed-vo'])
-        call.extend(['--vo','xv','--fixed-vo'])
+        call.extend(['-vo','omapfb', '--fixed-vo']) # not working atm
       else:
         call.extend(['--vo','xv','--no-fixed-vo'])
       call.extend(['--playlist='+TMPFILE])  
@@ -244,7 +244,7 @@ def single_video_data(videoid):
 
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False):
+    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False, video player='mplayer'):
         config=self.read_config()
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
@@ -255,6 +255,8 @@ class TheTube(gtk.Window):
         self.omapfb=omapfb
         self.current_downloads=set()
         self.search_terms=config.setdefault("search_terms",dict())
+        self.video_player=video_player
+        self.use_http=True if video_player=='mplayer' else False
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -458,7 +460,7 @@ class TheTube(gtk.Window):
 
         self.yt_dl=None
         if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
 
         self.filechooser = gtk.FileChooserDialog('Select download directory', self.window, 
                     gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Select', 2))
@@ -586,7 +588,7 @@ class TheTube(gtk.Window):
         if self.preload_ytdl and self.bandwidth!=prev:
           if self.yt_dl:
             self.yt_dl.terminate()
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
 
     def on_tv(self,widget):
         self.omapfb=not self.omapfb
@@ -679,7 +681,7 @@ class TheTube(gtk.Window):
           self.set_store(*self.prev_key)
 
     def get_item_video_url(self, item):
-        item['mplayer_url']=get_video_url( item['player']['default'],bandwidth=self.bandwidth_string())
+        item['mplayer_url']=get_video_url( item['player']['default'],bandwidth=self.bandwidth_string(), use_http=self.use_http)
         print item['mplayer_url']
 
     def set_playlist_label(self):
@@ -803,26 +805,26 @@ class TheTube(gtk.Window):
         else:
           mplayer_url=None
         if mplayer_url is None or mplayer_url=="FAIL": 
-          mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl)
+          mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl,use_http=self.use_http)
           if item is not None:
             item['mplayer_url']=mplayer_url
-        play_url([mplayer_url],fullscreen=self.showfullscreen,omapfb=self.omapfb)
+        play_url([mplayer_url],fullscreen=self.showfullscreen,omapfb=self.omapfb,player=self.video_player)
         self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string())
+          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
 
     def play_playlist(self,playlist):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy playing playlist"))
         urllist=[]
         for item in playlist:
           if item[COL_ITEM]['mplayer_url'] is None or item[COL_ITEM]['mplayer_url'] is "FAIL":
-            url=get_video_url( item[COL_ITEM]['player']['default'],bandwidth=self.bandwidth_string())
+            url=get_video_url( item[COL_ITEM]['player']['default'],bandwidth=self.bandwidth_string(), use_http=self.use_http)
             item[COL_ITEM]['mplayer_url']=url
           url=item[COL_ITEM]['mplayer_url']
           urllist.append(url)
-        play_url(urllist,fullscreen=self.showfullscreen,omapfb=self.omapfb)
+        play_url(urllist,fullscreen=self.showfullscreen,omapfb=self.omapfb,player=self.video_player)
         self.message.set_text(truncate("stopped playing playlist"))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
@@ -935,6 +937,8 @@ def new_option_parser():
                       help="preload youtube-dl",default=False)
     result.add_option("-m", action="store_true", dest="omapfb",
                       help="use omapfb in mplayer",default=False)
+    result.add_option("-v", action="store", dest="video_player",
+                      help="video player to use (mpv or mplayer)",default='mplayer')
     return result
 
 if __name__=="__main__":
@@ -942,5 +946,5 @@ if __name__=="__main__":
   print options
 
   application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
-    omapfb=options.omapfb)
+    omapfb=options.omapfb,video_player=options.video_player)
   gtk.main()
