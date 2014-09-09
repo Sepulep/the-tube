@@ -8,16 +8,15 @@ export LD_LIBRARY_PATH=/mnt/utmp/thetube/lib:$LD_LIBRARY_PATH
 
 export HOME="/mnt/utmp/thetube"
 
-#ldd /mnt/utmp/thetube/bin/mpv
+ldd /mnt/utmp/thetube/bin/mpv
 
-which mplayer
-if [ $? -ne 0 ]; then
-zenity --warning --text="mplayer not found - install the community codec pack for mplayer (tvout)"
-fi
+#which mplayer
+#if [ $? -ne 0 ]; then
+#zenity --warning --text="mplayer not found - install the community codec pack for mplayer (tvout)"
+#fi
 
-OPTION1="run The Tube (mpv)"
-OPTION1b="run The Tube (mplayer)"
-OPTION2="run The Tube for tv-out (mplayer, set HW layer)"
+OPTION1="run The Tube"
+OPTION2="run The Tube (for TV out)"
 OPTION3="update youtube-dl"
 OPTION4="revert youtube-dl to pnd version"
 
@@ -25,7 +24,6 @@ SELECT=`zenity --list --width=360 --height=280 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
-   FALSE "$OPTION1b" \
    FALSE "$OPTION2" \
    FALSE "$OPTION3" \
    FALSE "$OPTION4"`
@@ -35,13 +33,9 @@ if [ "$SELECT" == "$OPTION1" ]; then
 cd /mnt/utmp/thetube/bin/
 python thetube.py -f -p -v mpv
 fi
-if [ "$SELECT" == "$OPTION1b" ]; then
-cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p
-fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -m
+python thetube.py -f -p -v mpv -d x11
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/

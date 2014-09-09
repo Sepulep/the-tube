@@ -4,12 +4,12 @@
 
    <package id="thetube">
            <author name="Sepulep" website="http://www.openpandora.org/"/>
-           <version major="0" minor="2" release="0" build="3"/>
+           <version major="0" minor="2" release="1" build="1"/>
            <titles>
                    <title lang="en_US">The Tube</title>
            </titles>
            <descriptions>
-                   <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mplayer.</description>
+                   <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mpv.</description>
            </descriptions>
    </package>
 
@@ -18,10 +18,10 @@
     <title lang="en_US">The Tube</title>
 
     <author name="Sepulep" website="http://www.openpandora.org/"/>
-    <version major="0" minor="2" release="0" build="3"/>	      <!--This programs version-->
+    <version major="0" minor="2" release="1" build="1"/>	      <!--This programs version-->
     <osversion major="1" minor="5" release="5" build="0"/>		<!--The minimum OS version required-->
 
-    <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mplayer.</description>
+    <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mpv.</description>
 
     <icon src="./icon.png"/>
 

@@ -112,14 +112,14 @@ def download_video(url, download_directory, progressbar, bandwidth="5"):
     print "end"
     return "download finished: "+ destination
     
-def play_url(url, player="mpv",novideo=False, fullscreen=False, omapfb=False):
+def play_url(url, player="mpv",novideo=False, fullscreen=False, vo_driver="xv",keep_aspect=True):
     assert player in ["mplayer","mpv"]
     if player == "mplayer":
-        play_url_mplayer(url,novideo,fullscreen,omapfb)
+        play_url_mplayer(url,novideo,fullscreen,vo_driver,keep_aspect)
     if player == "mpv":
-        play_url_mpv(url,novideo,fullscreen,omapfb)
+        play_url_mpv(url,novideo,fullscreen,vo_driver,keep_aspect)
     
-def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
+def play_url_mplayer(url,novideo=False,fullscreen=False, vo_driver="xv",keep_aspect=True):
     
     TMPFILE="/tmp/_mplayer_playlist"
     
@@ -134,17 +134,17 @@ def play_url_mplayer(url,novideo=False,fullscreen=False, omapfb=False):
       call = ['mplayer', '-quiet']
       if fullscreen:
         call.extend(['-fs'])
-      if omapfb:
-        call.extend(['-vo','omapfb', '-fixed-vo'])
+      if vo_driver=='omapfb':
+        call.extend(['-vo',vo_driver, '-fixed-vo'])
       else:
-        call.extend(['-vo','xv'])
+        call.extend(['-vo',vo_driver])
       call.extend(['-playlist', TMPFILE])  
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()
     print "playing done"
 
-def play_url_mpv(url,novideo=False,fullscreen=False, omapfb=False):
+def play_url_mpv(url,novideo=False,fullscreen=False, vo_driver="xv",keep_aspect=True):
     
     TMPFILE="/tmp/_mplayer_playlist"
     
@@ -154,16 +154,19 @@ def play_url_mpv(url,novideo=False,fullscreen=False, omapfb=False):
     f.close()  
     
     if novideo:
-      call = ['mpv', '--quiet', '-no-video', '--playlist='+TMPFILE]
+      call = ['mpv', '--really-quiet', '-no-video', '--playlist='+TMPFILE]
     else:
-      call = ['mpv', '--quiet']
+      call = ['mpv', '--really-quiet','--no-osc','--no-osd-bar','--osd-font-size=30']
       if fullscreen:
         call.extend(['--fs'])
-      if omapfb:
-        call.extend(['-vo','omapfb', '--fixed-vo']) # not working atm
+      if not keep_aspect:
+        call.extend(['--no-keepaspect'])
+      if vo_driver=="x11":
+        call.extend(['-vo',vo_driver, '--fixed-vo','--sws-scaler=mozilla_neon'])
       else:
-        call.extend(['--vo','xv','--no-fixed-vo'])
+        call.extend(['-vo',vo_driver,'--no-fixed-vo'])
       call.extend(['--playlist='+TMPFILE])  
+    print call
     player = subprocess.Popen(call)
     atexit.register(kill_process,player)
     player.wait()
@@ -244,7 +247,7 @@ def single_video_data(videoid):
 
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,omapfb=False, video_player='mplayer'):
+    def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", video_player='mplayer'):
         config=self.read_config()
         self.showfullscreen=fullscreen
         self.preload_ytdl=preload_ytdl
@@ -252,7 +255,8 @@ class TheTube(gtk.Window):
         self.playing=False
         self.feed_mesg=""
         self.download_directory=config.setdefault("download_directory",os.getenv("HOME")+"/movie")
-        self.omapfb=omapfb
+        self.vo_driver=vo_driver
+        self.keep_aspect=False
         self.current_downloads=set()
         self.search_terms=config.setdefault("search_terms",dict())
         self.video_player=video_player
@@ -341,19 +345,19 @@ class TheTube(gtk.Window):
         button480=gtk.RadioButton(None,"480p")
         button360=gtk.RadioButton(button480,"360p")
         button240=gtk.RadioButton(button480,"240p")
-#        buttontv=gtk.CheckButton("TV out")
+        buttontv=gtk.CheckButton("Keep ratio")
         
         self.button480=button480
         self.button360=button360
         self.button240=button240
-#        self.buttontv=buttontv
+        self.buttontv=buttontv
                 
         button480.child.modify_font(pango.FontDescription("sans 9"))
         button360.child.modify_font(pango.FontDescription("sans 9"))
         button240.child.modify_font(pango.FontDescription("sans 9"))
-#        buttontv.child.modify_font(pango.FontDescription("sans 9"))
+        buttontv.child.modify_font(pango.FontDescription("sans 9"))
 
-#        self.buttontv.set_active(self.omapfb)
+        self.buttontv.set_active(self.keep_aspect)
         self.button240.set_active(self.bandwidth=="240p")
         self.button360.set_active(self.bandwidth=="360p") 
         self.button480.set_active(self.bandwidth=="480p")
@@ -361,7 +365,7 @@ class TheTube(gtk.Window):
         button480.connect("toggled", self.on_res,"480p")
         button360.connect("toggled", self.on_res,"360p")
         button240.connect("toggled", self.on_res,"240p")
-#        buttontv.connect("toggled", self.on_tv)
+        buttontv.connect("toggled", self.on_aspect)
         
         playlistButton = gtk.Button()
         playlistButton.set_size_request(28,32)
@@ -370,7 +374,7 @@ class TheTube(gtk.Window):
         toolbar.pack_start(playlistButton,False,False,0)
         self.playlistButton=playlistButton
 
-#        toolbar.pack_end(buttontv,False,False,0)
+        toolbar.pack_end(buttontv,False,False,0)
         toolbar.pack_end(button240,False,False,0)
         toolbar.pack_end(button360,False,False,0)
         toolbar.pack_end(button480,False,False,0)
@@ -590,8 +594,8 @@ class TheTube(gtk.Window):
             self.yt_dl.terminate()
           self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
 
-    def on_tv(self,widget):
-        self.omapfb=not self.omapfb
+    def on_aspect(self,widget):
+        self.keep_aspect=not self.keep_aspect
         
     def on_search(self,widget):
         text = widget.get_text()
@@ -808,7 +812,7 @@ class TheTube(gtk.Window):
           mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl,use_http=self.use_http)
           if item is not None:
             item['mplayer_url']=mplayer_url
-        play_url([mplayer_url],fullscreen=self.showfullscreen,omapfb=self.omapfb,player=self.video_player)
+        play_url([mplayer_url],fullscreen=self.showfullscreen,vo_driver=self.vo_driver,player=self.video_player,keep_aspect=self.keep_aspect)
         self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
@@ -824,7 +828,7 @@ class TheTube(gtk.Window):
             item[COL_ITEM]['mplayer_url']=url
           url=item[COL_ITEM]['mplayer_url']
           urllist.append(url)
-        play_url(urllist,fullscreen=self.showfullscreen,omapfb=self.omapfb,player=self.video_player)
+        play_url(urllist,fullscreen=self.showfullscreen,vo_driver=self.vo_driver,player=self.video_player,keep_aspect=self.keep_aspect)
         self.message.set_text(truncate("stopped playing playlist"))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
@@ -881,6 +885,8 @@ class TheTube(gtk.Window):
           self.on_add()
         if keyname in ["r","R"]:
           self.on_remove()
+        if keyname in ["k","K"]:
+          self.on_aspect()
         if keyname in ["l","L"]:
           self.playlistButton.emit("activate")
         if keyname in ["c","C"]:
@@ -935,10 +941,10 @@ def new_option_parser():
                       help="run fullscreen (recommend 800x480)",default=False)
     result.add_option("-p", action="store_true", dest="preload_ytdl",
                       help="preload youtube-dl",default=False)
-    result.add_option("-m", action="store_true", dest="omapfb",
-                      help="use omapfb in mplayer",default=False)
     result.add_option("-v", action="store", dest="video_player",
                       help="video player to use (mpv or mplayer)",default='mplayer')
+    result.add_option("-d", action="store", dest="video_driver",
+                      help="driver to use (eg xv, x11) ",default='xv')
     return result
 
 if __name__=="__main__":
@@ -946,5 +952,5 @@ if __name__=="__main__":
   print options
 
   application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
-    omapfb=options.omapfb,video_player=options.video_player)
+    vo_driver=options.video_driver,video_player=options.video_player)
   gtk.main()
