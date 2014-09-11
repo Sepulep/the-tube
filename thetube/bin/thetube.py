@@ -915,7 +915,7 @@ class TheTube(gtk.Window):
     def on_yt_fetcher(self):
         if self.yt_dl.yt_fetcher=="pafy":
           self.yt_dl.yt_fetcher=="youtube-dl"
-        if self.yt_dl.yt_fetcher=="youtube-dl"
+        if self.yt_dl.yt_fetcher=="youtube-dl":
           self.yt_dl.yt_fetcher="pafy"
         self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
           
