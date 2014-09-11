@@ -3,7 +3,7 @@
 DOCSTRING="""
 General keyboard shortcuts:
       'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
-      '2'=max 240p', '3'=max 360p, '4'=max 480p, 'd'=download, 'f'=set download folder, 'q'=quit
+      '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download, 'f'=set download folder, 'q'=quit
 Playlist commands: 
       'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
 """
@@ -57,120 +57,156 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
-def get_video_url(url="",bandwidth="5",preload=False,yt_dl=None, use_http=True):
 
-    if yt_dl is None:
-      security='' if not use_http else '--prefer-insecure'
-      call = "./youtube-dl -g -f " + bandwidth + " " + security + " -a -"
-      print call
-      yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
-        stdin=subprocess.PIPE, shell=True)
-      atexit.register(kill_process,yt_dl)
+class ytdl(object):
+    def __init__(self,yt_fetcher="youtube-dl",preload=False,use_http=True,bandwidth="480p"):
+        self.yt_fetcher=yt_fetcher
+        self.preload=preload
+        self.use_http=use_http
+        self.bandwidth=bandwidth
+        if self.yt_fetcher=="youtube-dl":
+          self.yt_dl=None
+        self.restart()
 
-    if preload:
-      return yt_dl
-    
-    (url, err) = yt_dl.communicate(input=url)
-    if yt_dl.returncode != 0:
-      sys.stderr.write(err)
-      return "FAIL"
-#      raise RuntimeError('Error getting URL.')
+    def restart(self):
+        if self.yt_fetcher=="youtube-dl" and self.preload:
+          self.start_ytdl()
 
-    return url
+    def get_video_url(self,url):
+        if self.yt_fetcher=="youtube-dl":
+          self.get_video_url_ytdl(url)
 
-def download_video(url, download_directory, progressbar, bandwidth="5"):
-    
-    call = "./youtube-dl --newline --restrict-filenames -f " + bandwidth + \
-         " -o '"+download_directory+"/%(uploader)s-%(title)s-%(id)s.%(ext)s' -a -"
-    print call
-    yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
-      stdin=subprocess.PIPE, shell=True)
-    atexit.register(kill_process,yt_dl)
-    
-    yt_dl.stdin.write(url)
-    yt_dl.stdin.close()
-    out="1"
-    destination="destination file unknown"
-    while out:
-      out=yt_dl.stdout.readline()
-      if out.find("[download]")<0:
-        continue
-      if out.find("has already been downloaded")>=0:  
-        destination=out.split()[1]
-        return truncate(destination,NSTRING-17)+" already exists"
-      if out.find("Destination")>=0:
-        destination=out.split()[2]
-        progressbar.set_text(truncate(destination))
-      else:
-        percent=float(out.split()[1][:-1])
-        progressbar.set_fraction(percent/100.)  
-    err=yt_dl.stderr.readlines()
-    yt_dl.wait()
-    if yt_dl.returncode != 0:
-      sys.stderr.write(err)
-      raise RuntimeError('Error getting URL.')
-    print "end"
-    return "download finished: "+ destination
-    
-def play_url(url, player="mpv",novideo=False, fullscreen=False, vo_driver="xv",keep_aspect=True):
-    assert player in ["mplayer","mpv"]
-    if player == "mplayer":
-        play_url_mplayer(url,novideo,fullscreen,vo_driver,keep_aspect)
-    if player == "mpv":
-        play_url_mpv(url,novideo,fullscreen,vo_driver,keep_aspect)
-    
-def play_url_mplayer(url,novideo=False,fullscreen=False, vo_driver="xv",keep_aspect=True):
-    
-    TMPFILE="/tmp/_mplayer_playlist"
-    
-    f=open(TMPFILE,"w")
-    for u in url:
-      f.write(u.decode('UTF-8').strip()+"\n")
-    f.close()  
-    
-    if novideo:
-      call = ['mplayer', '-quiet', '-novideo', '-playlist', TMPFILE]
-    else:
-      call = ['mplayer', '-quiet']
-      if fullscreen:
-        call.extend(['-fs'])
-      if vo_driver=='omapfb':
-        call.extend(['-vo',vo_driver, '-fixed-vo'])
-      else:
-        call.extend(['-vo',vo_driver])
-      call.extend(['-playlist', TMPFILE])  
-    player = subprocess.Popen(call)
-    atexit.register(kill_process,player)
-    player.wait()
-    print "playing done"
+    def download_video(self,url, download_directory, progressbar):
+        if self.yt_fetcher=="youtube-dl":
+          self.download_video_ytdl(url, download_directory, progressbar)
 
-def play_url_mpv(url,novideo=False,fullscreen=False, vo_driver="xv",keep_aspect=True):
+    def start_ytdl(self):
+        if self.yt_dl is not None:
+          self.yt_dl.terminate()
+        security='' if not self.use_http else '--prefer-insecure'
+        bandwidth=self.ytdl_bandwidth_string()
+        call = "./youtube-dl -g -f " + bandwidth + " " + security + " -a -"
+        print call
+        self.yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
+          stdin=subprocess.PIPE, shell=True)
+        atexit.register(kill_process,self.yt_dl)
+
+    def get_video_url_ytdl(url):
+        if self.yt_dl is None:
+          self.start_ytdl()
+        
+        (url, err) = self.yt_dl.communicate(input=url)
+        if self.yt_dl.returncode != 0:
+          sys.stderr.write(err)
+          return "FAIL"
+        self.yt_dl=None
+        return url
+
+    def ytdl_bandwidth_string(self):
+        bw_list=[]
+        if self.bandwidth in ["480p"]: bw_list.extend(ENCODING480p) 
+        if self.bandwidth in ["480p","360p"]: bw_list.extend(ENCODING360p) 
+        if self.bandwidth in ["480p","360p","240p"]: bw_list.extend(ENCODING240p) 
+        bw_list.extend([17])
+        return '/'.join(map(lambda x:str(x), bw_list))
+
+    def download_video_ytdl(url, download_directory, progressbar):
+        
+        bandwidth=self.ytdl_bandwidth_string()
+        call = "./youtube-dl --newline --restrict-filenames -f " + bandwidth + \
+             " -o '"+download_directory+"/%(uploader)s-%(title)s-%(id)s.%(ext)s' -a -"
+        print call
+        yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
+          stdin=subprocess.PIPE, shell=True)
+        atexit.register(kill_process,yt_dl)
+        
+        yt_dl.stdin.write(url)
+        yt_dl.stdin.close()
+        out="1"
+        destination="destination file unknown"
+        while out:
+          out=yt_dl.stdout.readline()
+          if out.find("[download]")<0:
+            continue
+          if out.find("has already been downloaded")>=0:  
+            destination=out.split()[1]
+            return truncate(destination,NSTRING-17)+" already exists"
+          if out.find("Destination")>=0:
+            destination=out.split()[2]
+            progressbar.set_text(truncate(destination))
+          else:
+            percent=float(out.split()[1][:-1])
+            progressbar.set_fraction(percent/100.)  
+        err=yt_dl.stderr.readlines()
+        yt_dl.wait()
+        if yt_dl.returncode != 0:
+          sys.stderr.write(err)
+          raise RuntimeError('Error getting URL.')
+        print "end"
+        return "download finished: "+ destination
+
+class player(object):
+    def __init__(self,player="mpv",novideo=False, fullscreen=False, vo_driver="xv",keep_aspect=True):
+        self.player=player
+        self.novideo=novideo
+        self.fullscreen=fullscreen
+        self.vo_driver=vo_driver
+        self.keep_aspect=keep_aspect
+        self.TMPFILE="/tmp/_mplayer_playlist"
+ 
+    def play_url(self,url):
+                
+        f=open(self.TMPFILE,"w")
+        for u in url:
+          f.write(u.decode('UTF-8').strip()+"\n")
+        f.close()
+        
+        assert self.player in ["mplayer","mpv"]
+
+        if self.player == "mplayer":
+            call=self.call_mplayer()
+        if self.player == "mpv":
+            call=self.call_mpv()
+        print "subprocess call:", call
+        
+        player = subprocess.Popen(call)
+        atexit.register(kill_process,player)
+        player.wait()
+        print "playing done"
+
+    def call_mplayer(self):
+        call = ['mplayer', '-quiet','-playlist', self.TMPFILE]
+        if self.novideo:
+          call.extend(['-novideo'])
+        else:
+          if self.fullscreen:
+            call.extend(['-fs'])
+          if self.keep_aspect:
+            call.extend(['-zoom','-xy 800'])
+          else:
+            call.extend(['-zoom','-x 800','-y 480'])            
+          if self.vo_driver=='omapfb':
+            call.extend(['-vo',vo_driver, '-fixed-vo'])
+          else:
+            call.extend(['-vo',vo_driver])
+        return call
     
-    TMPFILE="/tmp/_mplayer_playlist"
-    
-    f=open(TMPFILE,"w")
-    for u in url:
-      f.write(u.decode('UTF-8').strip()+"\n")
-    f.close()  
-    
-    if novideo:
-      call = ['mpv', '--really-quiet', '-no-video', '--playlist='+TMPFILE]
-    else:
-      call = ['mpv', '--really-quiet','--no-osc','--no-osd-bar','--osd-font-size=30']
-      if fullscreen:
-        call.extend(['--fs'])
-      if not keep_aspect:
-        call.extend(['--no-keepaspect'])
-      if vo_driver=="x11":
-        call.extend(['-vo',vo_driver, '--fixed-vo','--sws-scaler=mozilla_neon'])
-      else:
-        call.extend(['-vo',vo_driver,'--no-fixed-vo'])
-      call.extend(['--playlist='+TMPFILE])  
-    print call
-    player = subprocess.Popen(call)
-    atexit.register(kill_process,player)
-    player.wait()
-    print "playing done"
+    def call_mpv(self):
+        call=['mpv', '--quiet','--playlist='+self.TMPFILE]
+        if self.novideo:
+          call.extend(['-no-video'])
+        else:
+          call.extend(['--no-osc','--no-osd-bar','--osd-font-size=30',
+                  '--cache=256','--framedrop=yes'])
+          if self.fullscreen:
+            call.extend(['--fs'])
+          if not self.keep_aspect:
+            call.extend(['--no-keepaspect'])
+          if self.vo_driver=="x11":
+            call.extend(['-vo',vo_driver, '--fixed-vo','--sws-scaler=mozilla_neon'])
+          else:
+            call.extend(['-vo',vo_driver,'--no-fixed-vo'])
+        return call
         
 def search_feed(terms):
     def fetch_cb(start, maxresults, ordering):
@@ -247,20 +283,22 @@ def single_video_data(videoid):
 
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", video_player='mplayer'):
+    def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer'):
         config=self.read_config()
-        self.showfullscreen=fullscreen
-        self.preload_ytdl=preload_ytdl
+
+        self.player=player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
+
         self.bandwidth=config.setdefault("bandwidth","360p")
+        self.use_http=True if video_player=='mplayer' else False
+
+        self.yt_dl=ytdl(yt_fetcher="youtube-dl",preload_ytdl=preload_ytdl,
+          bandwidth=self.bandwidth,use_http=self.use_http)
+
         self.playing=False
         self.feed_mesg=""
         self.download_directory=config.setdefault("download_directory",os.getenv("HOME")+"/movie")
-        self.vo_driver=vo_driver
-        self.keep_aspect=False
         self.current_downloads=set()
         self.search_terms=config.setdefault("search_terms",dict())
-        self.video_player=video_player
-        self.use_http=True if video_player=='mplayer' else False
 
         self.ordering=0
         self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -272,7 +310,7 @@ class TheTube(gtk.Window):
         
         self.connect("destroy", self.on_quit)
         self.set_title("The Tube")
-        if self.showfullscreen:
+        if fullscreen:
           self.fullscreen()
           
         vbox = gtk.VBox(False, 0)
@@ -345,7 +383,7 @@ class TheTube(gtk.Window):
         button480=gtk.RadioButton(None,"480p")
         button360=gtk.RadioButton(button480,"360p")
         button240=gtk.RadioButton(button480,"240p")
-        buttontv=gtk.CheckButton("Keep ratio")
+        buttontv=gtk.CheckButton("keep aspect ")
         
         self.button480=button480
         self.button360=button360
@@ -357,7 +395,7 @@ class TheTube(gtk.Window):
         button240.child.modify_font(pango.FontDescription("sans 9"))
         buttontv.child.modify_font(pango.FontDescription("sans 9"))
 
-        self.buttontv.set_active(self.keep_aspect)
+        self.buttontv.set_active(self.player.keep_aspect)
         self.button240.set_active(self.bandwidth=="240p")
         self.button360.set_active(self.bandwidth=="360p") 
         self.button480.set_active(self.bandwidth=="480p")
@@ -461,10 +499,6 @@ class TheTube(gtk.Window):
         self.set_store("Openpandora",1,"relevance")
         
         self.connect('key_press_event', self.on_key_press_event)
-
-        self.yt_dl=None
-        if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
 
         self.filechooser = gtk.FileChooserDialog('Select download directory', self.window, 
                     gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Select', 2))
@@ -589,13 +623,12 @@ class TheTube(gtk.Window):
         if self.button480.get_active(): self.bandwidth="480p"
         if self.button360.get_active(): self.bandwidth="360p"
         if self.button240.get_active(): self.bandwidth="240p"
-        if self.preload_ytdl and self.bandwidth!=prev:
-          if self.yt_dl:
-            self.yt_dl.terminate()
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
+        if self.bandwidth!=prev:
+          self.yt_dl.bandwidth=self.bandwidth_string()
+          self.yt_dl.start()
 
     def on_aspect(self,widget):
-        self.keep_aspect=not self.keep_aspect
+        self.player.keep_aspect=not self.player.keep_aspect
         
     def on_search(self,widget):
         text = widget.get_text()
@@ -685,7 +718,7 @@ class TheTube(gtk.Window):
           self.set_store(*self.prev_key)
 
     def get_item_video_url(self, item):
-        item['mplayer_url']=get_video_url( item['player']['default'],bandwidth=self.bandwidth_string(), use_http=self.use_http)
+        item['mplayer_url']=self.yt_dl.get_video_url( item['player']['default'])
         print item['mplayer_url']
 
     def set_playlist_label(self):
@@ -761,7 +794,7 @@ class TheTube(gtk.Window):
          self.vbox.pack_start(progressbar,False,False,0)
          progressbar.show()
          try:
-           result=download_video(url,self.download_directory,progressbar,bandwidth=self.bandwidth_string())
+           result=self.yt_dl.download_video(url,self.download_directory,progressbar)
            self.message.set_text(truncate(result))
          except:
            self.message.set_text("download "+truncate(title,NSTRING-16)+" failed")
@@ -809,29 +842,29 @@ class TheTube(gtk.Window):
         else:
           mplayer_url=None
         if mplayer_url is None or mplayer_url=="FAIL": 
-          mplayer_url=get_video_url(url,bandwidth=self.bandwidth_string(),yt_dl=self.yt_dl,use_http=self.use_http)
+          mplayer_url=self.yt_dl.get_video_url(url)
           if item is not None:
             item['mplayer_url']=mplayer_url
-        play_url([mplayer_url],fullscreen=self.showfullscreen,vo_driver=self.vo_driver,player=self.video_player,keep_aspect=self.keep_aspect)
+        self.player.play_url([mplayer_url])
         self.message.set_text(truncate("stopped playing "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
-        if self.preload_ytdl:
-          self.yt_dl=get_video_url(preload=True,bandwidth=self.bandwidth_string(), use_http=self.use_http)
+        self.yt_dl.restart()
 
     def play_playlist(self,playlist):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy playing playlist"))
         urllist=[]
         for item in playlist:
           if item[COL_ITEM]['mplayer_url'] is None or item[COL_ITEM]['mplayer_url'] is "FAIL":
-            url=get_video_url( item[COL_ITEM]['player']['default'],bandwidth=self.bandwidth_string(), use_http=self.use_http)
+            url=self.yt_dl.get_video_url( item[COL_ITEM]['player']['default'])
             item[COL_ITEM]['mplayer_url']=url
           url=item[COL_ITEM]['mplayer_url']
           urllist.append(url)
-        play_url(urllist,fullscreen=self.showfullscreen,vo_driver=self.vo_driver,player=self.video_player,keep_aspect=self.keep_aspect)
+        self.player.play_url(urllist)
         self.message.set_text(truncate("stopped playing playlist"))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
+        self.yt_dl.restart()
 
     def on_help(self,widget=None):
         self.infoView.get_buffer().set_text(DOCSTRING)
@@ -901,14 +934,6 @@ class TheTube(gtk.Window):
           self.button480.set_active(not self.button480.get_active())
 #        if keyname in ["t","T"]:
 #          self.buttontv.set_active(not self.buttontv.get_active())
-
-    def bandwidth_string(self):
-        bw_list=[]
-        if self.bandwidth in ["480p"]: bw_list.extend(ENCODING480p) 
-        if self.bandwidth in ["480p","360p"]: bw_list.extend(ENCODING360p) 
-        if self.bandwidth in ["480p","360p","240p"]: bw_list.extend(ENCODING240p) 
-        bw_list.extend([17])
-        return '/'.join(map(lambda x:str(x), bw_list))
 
     def read_config(self):
         try:
