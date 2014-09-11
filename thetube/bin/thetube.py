@@ -914,7 +914,7 @@ class TheTube(gtk.Window):
         self.player.player=p
         self.player.vo_driver=v
         self.yt_dl.use_http=True if p=='mplayer' else False
-        self.flash_message("changed video player to: "+p+" with "+v)
+        self.flash_message("changed video player to: "+p+" with "+v+" (hit home to reset store)")
     
     def on_yt_fetcher(self):
         if self.yt_dl.yt_fetcher=="pafy":
