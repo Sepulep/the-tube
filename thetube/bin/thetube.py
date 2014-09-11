@@ -115,7 +115,6 @@ class ytdl(object):
     def get_video_url_pafy(self,url):
         v=pafy.new(url)
         bw_list=self.yt_bandwidths()
-        print bw_list,v.streams
         for b in bw_list:
           for s in v.streams:
             if int(s.itag)==b:
@@ -820,7 +819,8 @@ class TheTube(gtk.Window):
          try:
            result=self.yt_dl.download_video(url,self.download_directory,progressbar)
            self.message.set_text(truncate(result))
-         except:
+         except Exception as ex:
+           print ex
            self.message.set_text("download "+truncate(title,NSTRING-16)+" failed")
          progressbar.destroy()
          self.current_downloads.remove(url)         
