@@ -910,11 +910,11 @@ class TheTube(gtk.Window):
         AVAILABLE_VIDEO_PLAYERS.extend([(p,v)])
         self.player.player=p
         self.player.vo_driver=v
-        self.flash_message("current video player: "+p+" with "+v)
+        self.flash_message("changed video player to: "+p+" with "+v)
     
     def on_yt_fetcher(self):
         if self.yt_dl.yt_fetcher=="pafy":
-          self.yt_dl.yt_fetcher=="youtube-dl"
+          self.yt_dl.yt_fetcher="youtube-dl"
         if self.yt_dl.yt_fetcher=="youtube-dl":
           self.yt_dl.yt_fetcher="pafy"
         self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
