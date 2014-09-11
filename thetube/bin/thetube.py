@@ -25,6 +25,7 @@ import datetime
 import atexit
 from optparse import OptionParser
 import operator
+import pafy
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -59,9 +60,9 @@ def kill_process(x):
 
 
 class ytdl(object):
-    def __init__(self,yt_fetcher="youtube-dl",preload=False,use_http=True,bandwidth="480p"):
+    def __init__(self,yt_fetcher="youtube-dl",preload_ytdl=False,use_http=True,bandwidth="480p"):
         self.yt_fetcher=yt_fetcher
-        self.preload=preload
+        self.preload_ytdl=preload_ytdl
         self.use_http=use_http
         self.bandwidth=bandwidth
         if self.yt_fetcher=="youtube-dl":
@@ -69,15 +70,19 @@ class ytdl(object):
         self.restart()
 
     def restart(self):
-        if self.yt_fetcher=="youtube-dl" and self.preload:
+        if self.yt_fetcher=="youtube-dl" and self.preload_ytdl:
           self.start_ytdl()
 
     def get_video_url(self,url):
         if self.yt_fetcher=="youtube-dl":
-          self.get_video_url_ytdl(url)
+          return self.get_video_url_ytdl(url)
+        if self.yt_fetcher=="pafy":
+          return self.get_video_url_pafy(url)
 
     def download_video(self,url, download_directory, progressbar):
         if self.yt_fetcher=="youtube-dl":
+          self.download_video_ytdl(url, download_directory, progressbar)
+        else:
           self.download_video_ytdl(url, download_directory, progressbar)
 
     def start_ytdl(self):
@@ -91,7 +96,7 @@ class ytdl(object):
           stdin=subprocess.PIPE, shell=True)
         atexit.register(kill_process,self.yt_dl)
 
-    def get_video_url_ytdl(url):
+    def get_video_url_ytdl(self,url):
         if self.yt_dl is None:
           self.start_ytdl()
         
@@ -102,15 +107,30 @@ class ytdl(object):
         self.yt_dl=None
         return url
 
-    def ytdl_bandwidth_string(self):
+    def get_video_url_pafy(self,url):
+        v=pafy.new(url)
+        bw_list=self.yt_bandwidths()
+        print bw_list,v.streams
+        for b in bw_list:
+          for s in v.streams:
+            if int(s.itag)==b:
+              url=s.url if self.use_http else s.url_https
+              return url
+        return "FAIL get_video_url_pafy"
+
+    def yt_bandwidths(self):
         bw_list=[]
         if self.bandwidth in ["480p"]: bw_list.extend(ENCODING480p) 
         if self.bandwidth in ["480p","360p"]: bw_list.extend(ENCODING360p) 
         if self.bandwidth in ["480p","360p","240p"]: bw_list.extend(ENCODING240p) 
         bw_list.extend([17])
+        return bw_list
+        
+    def ytdl_bandwidth_string(self):
+        bw_list=self.yt_bandwidths()
         return '/'.join(map(lambda x:str(x), bw_list))
 
-    def download_video_ytdl(url, download_directory, progressbar):
+    def download_video_ytdl(self,url, download_directory, progressbar):
         
         bandwidth=self.ytdl_bandwidth_string()
         call = "./youtube-dl --newline --restrict-filenames -f " + bandwidth + \
@@ -145,7 +165,7 @@ class ytdl(object):
         print "end"
         return "download finished: "+ destination
 
-class player(object):
+class video_player(object):
     def __init__(self,player="mpv",novideo=False, fullscreen=False, vo_driver="xv",keep_aspect=True):
         self.player=player
         self.novideo=novideo
@@ -182,13 +202,13 @@ class player(object):
           if self.fullscreen:
             call.extend(['-fs'])
           if self.keep_aspect:
-            call.extend(['-zoom','-xy 800'])
+            call.extend(['-zoom','-xy','800'])
           else:
-            call.extend(['-zoom','-x 800','-y 480'])            
+            call.extend(['-zoom','-x','800','-y','480'])            
           if self.vo_driver=='omapfb':
-            call.extend(['-vo',vo_driver, '-fixed-vo'])
+            call.extend(['-vo',self.vo_driver, '-fixed-vo'])
           else:
-            call.extend(['-vo',vo_driver])
+            call.extend(['-vo',self.vo_driver])
         return call
     
     def call_mpv(self):
@@ -203,9 +223,9 @@ class player(object):
           if not self.keep_aspect:
             call.extend(['--no-keepaspect'])
           if self.vo_driver=="x11":
-            call.extend(['-vo',vo_driver, '--fixed-vo','--sws-scaler=mozilla_neon'])
+            call.extend(['-vo',self.vo_driver, '--fixed-vo','--sws-scaler=mozilla_neon'])
           else:
-            call.extend(['-vo',vo_driver,'--no-fixed-vo'])
+            call.extend(['-vo',self.vo_driver,'--no-fixed-vo'])
         return call
         
 def search_feed(terms):
@@ -283,15 +303,15 @@ def single_video_data(videoid):
 
 
 class TheTube(gtk.Window): 
-    def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer'):
+    def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer',yt_fetcher="youtube-dl"):
         config=self.read_config()
 
-        self.player=player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
+        self.player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
 
         self.bandwidth=config.setdefault("bandwidth","360p")
         self.use_http=True if player=='mplayer' else False
 
-        self.yt_dl=ytdl(yt_fetcher="youtube-dl",preload_ytdl=preload_ytdl,
+        self.yt_dl=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
           bandwidth=self.bandwidth,use_http=self.use_http)
 
         self.playing=False
@@ -619,13 +639,12 @@ class TheTube(gtk.Window):
         return store
     
     def on_res(self,widget,res):
-        prev=self.bandwidth
         if self.button480.get_active(): self.bandwidth="480p"
         if self.button360.get_active(): self.bandwidth="360p"
         if self.button240.get_active(): self.bandwidth="240p"
-        if self.bandwidth!=prev:
-          self.yt_dl.bandwidth=self.bandwidth_string()
-          self.yt_dl.start()
+        if self.bandwidth!=self.yt_dl.bandwidth:
+          self.yt_dl.bandwidth=self.bandwidth
+          self.yt_dl.restart()
 
     def on_aspect(self,widget):
         self.player.keep_aspect=not self.player.keep_aspect
@@ -879,7 +898,7 @@ class TheTube(gtk.Window):
         self.infoView.show()
         items=self.iconView.get_selected_items()
         if items:
-           self.iconView.scroll_to_path(items[0],False,0.,0.)
+           self.iconView.scroll_to_path(items[0],True,0.,0.)
                     
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
@@ -970,6 +989,8 @@ def new_option_parser():
                       help="video player to use (mpv or mplayer)",default='mplayer')
     result.add_option("-d", action="store", dest="video_driver",
                       help="driver to use (eg xv, x11) ",default='xv')
+    result.add_option("-y", action="store", dest="yt_fetcher",
+                      help="youtube query to use (youtube-dl or pafy) ",default='youtube-dl')
     return result
 
 if __name__=="__main__":
@@ -977,5 +998,5 @@ if __name__=="__main__":
   print options
 
   application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
-    vo_driver=options.video_driver,player=options.player)
+    vo_driver=options.video_driver,player=options.player,yt_fetcher=options.yt_fetcher)
   gtk.main()
