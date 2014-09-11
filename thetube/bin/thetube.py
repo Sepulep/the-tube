@@ -289,7 +289,7 @@ class TheTube(gtk.Window):
         self.player=player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
 
         self.bandwidth=config.setdefault("bandwidth","360p")
-        self.use_http=True if video_player=='mplayer' else False
+        self.use_http=True if player=='mplayer' else False
 
         self.yt_dl=ytdl(yt_fetcher="youtube-dl",preload_ytdl=preload_ytdl,
           bandwidth=self.bandwidth,use_http=self.use_http)
@@ -966,7 +966,7 @@ def new_option_parser():
                       help="run fullscreen (recommend 800x480)",default=False)
     result.add_option("-p", action="store_true", dest="preload_ytdl",
                       help="preload youtube-dl",default=False)
-    result.add_option("-v", action="store", dest="video_player",
+    result.add_option("-v", action="store", dest="player",
                       help="video player to use (mpv or mplayer)",default='mplayer')
     result.add_option("-d", action="store", dest="video_driver",
                       help="driver to use (eg xv, x11) ",default='xv')
@@ -977,5 +977,5 @@ if __name__=="__main__":
   print options
 
   application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
-    vo_driver=options.video_driver,video_player=options.video_player)
+    vo_driver=options.video_driver,player=options.player)
   gtk.main()
