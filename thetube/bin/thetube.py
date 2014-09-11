@@ -4,6 +4,7 @@ DOCSTRING="""
 General keyboard shortcuts:
       'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
       '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download, 'f'=set download folder, 'q'=quit
+      'm'=cycle through video players
 Playlist commands: 
       'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
 """
@@ -50,6 +51,10 @@ FULLSCREEN=False
 PRELOAD_YTDL=True
 
 NSTRING=110
+
+AVAILABLE_VIDEO_PLAYERS=[("mpv","x11"),("mpv","xv")]
+if subprocess.call(["which","mplayer"])==0:
+  AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","xv"),("mplayer","omapfb")])
 
 def truncate(string,nstring=NSTRING):
   return (string[:nstring] + '..') if len(string) > (nstring+2) else string
@@ -900,6 +905,20 @@ class TheTube(gtk.Window):
         if items:
            self.iconView.scroll_to_path(items[0],True,0.,0.)
                     
+    def on_player_select(self):
+        p,v=AVAILABLE_VIDEO_PLAYERS.pop(0)
+        AVAILABLE_VIDEO_PLAYERS.extend([(p,v)])
+        self.player.player=p
+        self.player.vo_driver=v
+        self.flash_message("current video player: "+p+" with "+v)
+    
+    def on_yt_fetcher(self):
+        if self.yt_dl.yt_fetcher=="pafy":
+          self.yt_dl.yt_fetcher=="youtube-dl"
+        if self.yt_dl.yt_fetcher=="youtube-dl"
+          self.yt_dl.yt_fetcher="pafy"
+        self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
+          
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
 #        print "Key %s (%d) was pressed" % (keyname, event.keyval)
@@ -939,6 +958,10 @@ class TheTube(gtk.Window):
           self.on_remove()
         if keyname in ["k","K"]:
           self.on_aspect()
+        if keyname in ["m","M"]:
+          self.on_player_select()
+        if keyname in ["y","Y"]:
+          self.on_yt_fetcher()
         if keyname in ["l","L"]:
           self.playlistButton.emit("activate")
         if keyname in ["c","C"]:

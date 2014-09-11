@@ -16,7 +16,7 @@ ldd /mnt/utmp/thetube/bin/mpv
 #fi
 
 OPTION1="run The Tube"
-OPTION2="run The Tube (for TV out)"
+#OPTION2="run The Tube (for TV out)"
 OPTION3="update youtube-dl"
 OPTION4="revert youtube-dl to pnd version"
 
@@ -24,18 +24,17 @@ SELECT=`zenity --list --width=360 --height=280 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
-   FALSE "$OPTION2" \
    FALSE "$OPTION3" \
    FALSE "$OPTION4"`
 
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
 cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -v mpv
+python thetube.py -f -p -v mpv -d x11 -y pafy
 fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -v mpv -d x11
+python thetube.py -f -p -v mpv -d x11 -y pafy
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/
