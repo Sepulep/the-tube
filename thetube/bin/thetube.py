@@ -515,12 +515,7 @@ class TheTube(gtk.Window):
 
         self.add(vbox)
         
-        self.stores=dict()
-        self.stores[("__playlist__",1,"")]=dict(store=self.create_store(),
-                        message=self.playlist_message, istart=1,ntot=0,last=0)
-        self.playlist=self.stores[("__playlist__",1,"")]['store']
-        self.playlist_clipboard=self.create_store()
-        self.set_store("Openpandora",1,"relevance")
+        self.reset_store()
         
         self.connect('key_press_event', self.on_key_press_event)
 
@@ -534,6 +529,14 @@ class TheTube(gtk.Window):
 #        gobject.timeout_add(4000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
 #        gobject.timeout_add(2000, self.on_help)
 
+    def reset_store()
+        self.stores=dict()
+        self.stores[("__playlist__",1,"")]=dict(store=self.create_store(),
+                        message=self.playlist_message, istart=1,ntot=0,last=0)
+        self.playlist=self.stores[("__playlist__",1,"")]['store']
+        self.playlist_clipboard=self.create_store()
+        self.set_store("Openpandora",1,"relevance")
+    
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
 #        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
@@ -665,7 +668,7 @@ class TheTube(gtk.Window):
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
-        self.set_store("Openpandora",1,"relevance")
+        self.reset_store()
 
     def on_dir(self, widget=None):
         ans=self.filechooser.run()
