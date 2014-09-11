@@ -529,7 +529,7 @@ class TheTube(gtk.Window):
 #        gobject.timeout_add(4000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
 #        gobject.timeout_add(2000, self.on_help)
 
-    def reset_store()
+    def reset_store():
         self.stores=dict()
         self.stores[("__playlist__",1,"")]=dict(store=self.create_store(),
                         message=self.playlist_message, istart=1,ntot=0,last=0)
