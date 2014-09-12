@@ -1,13 +1,12 @@
 #!/usr/bin/python
 
-DOCSTRING="""
-General keyboard shortcuts:
+DOCSTRING="""General keyboard shortcuts:
       'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
       '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download, 'f'=set download folder, 'q'=quit
 Playlist commands: 
       'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
-Advanced commands (it may be necessary to reset the store with alt/start)
-      'm'=cycle through video players, 'y'=switch youtube query library
+Advanced commands
+      'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home, reset & clear cache
 """
 
 import time 
@@ -73,16 +72,23 @@ class ytdl(object):
         self.bandwidth=bandwidth
         self.yt_dl=None
         self.restart()
+        self._url_cache=dict()
 
     def restart(self):
         if self.yt_fetcher=="youtube-dl" and self.preload_ytdl:
           self.start_ytdl()
 
     def get_video_url(self,url):
-        if self.yt_fetcher=="youtube-dl":
-          return self.get_video_url_ytdl(url)
-        if self.yt_fetcher=="pafy":
-          return self.get_video_url_pafy(url)
+        key=(url,self.use_http,self.bandwidth)
+        if key not in self._url_cache or 
+             not isinstance(self._url_cache[key],basestring) or
+             not self._url_cache[key].startswith("http"):        
+          if self.yt_fetcher=="youtube-dl":
+            video_url=self.get_video_url_ytdl(url)
+          if self.yt_fetcher=="pafy":
+            video_url=self.get_video_url_pafy(url)
+          self._url_cache[key]=video_url
+        return self._url_cache[key]
 
     def download_video(self,url, download_directory, progressbar):
         if self.yt_fetcher=="youtube-dl":
@@ -626,7 +632,6 @@ class TheTube(gtk.Window):
   
           for i,item in enumerate(items):
             url=item['thumbnail']['sqDefault']
-            item['mplayer_url']=None
             timestring=str(datetime.timedelta(seconds=item['duration']))
             tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
             row=store.append([item['title'], self.missing, item,tooltip,i])
@@ -668,6 +673,7 @@ class TheTube(gtk.Window):
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
+        self.yt_dl._url_cache=dict()
         self.reset_store()
 
     def on_dir(self, widget=None):
@@ -705,11 +711,9 @@ class TheTube(gtk.Window):
         self.playing=True
 
         url = model[item][COL_ITEM]['player']['default']
-#        mplayer_url=model[item][COL_ITEM]['mplayer_url']
-        item=model[item][COL_ITEM]
         print 'Playing ' + url
 
-        t=threading.Thread(target=self.play, args=(url,title),kwargs=dict(item=item))
+        t=threading.Thread(target=self.play, args=(url,title))
         t.daemon=True
         t.start()
 
@@ -744,8 +748,7 @@ class TheTube(gtk.Window):
           self.set_store(*self.prev_key)
 
     def get_item_video_url(self, item):
-        item['mplayer_url']=self.yt_dl.get_video_url( item['player']['default'])
-        print item['mplayer_url']
+        print self.yt_dl.get_video_url( item['player']['default'])
 
     def set_playlist_label(self):
         self.playlistButton.set_label(str(len(self.playlist)))
@@ -761,7 +764,6 @@ class TheTube(gtk.Window):
             self.playlist.append(row)
             self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
             self.flash_cursor("blue")
-
 
             t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
             t.daemon=True
@@ -862,18 +864,14 @@ class TheTube(gtk.Window):
           self.message.set_text(truncate(message,NSTRING-4)+" "+(ibusy%4)*'.'+(3-ibusy%4)*' ')
           gobject.timeout_add(1000, self.busy_message,ibusy,message)
 
-    def play(self,url,title,item=None):
+    def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
-        if item is not None:
-          mplayer_url=item['mplayer_url']
+        mplayer_url=self.yt_dl.get_video_url(url)
+        if mplayer_url.startswidth("http"):
+          self.player.play_url([mplayer_url])
+          self.message.set_text(truncate("stopped playing "+title))
         else:
-          mplayer_url=None
-        if mplayer_url is None or mplayer_url=="FAIL": 
-          mplayer_url=self.yt_dl.get_video_url(url)
-          if item is not None:
-            item['mplayer_url']=mplayer_url
-        self.player.play_url([mplayer_url])
-        self.message.set_text(truncate("stopped playing "+title))
+          self.message.set_text(truncate("failed to get url for "+title))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         self.yt_dl.restart()
@@ -882,13 +880,14 @@ class TheTube(gtk.Window):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy playing playlist"))
         urllist=[]
         for item in playlist:
-          if item[COL_ITEM]['mplayer_url'] is None or item[COL_ITEM]['mplayer_url'] is "FAIL":
-            url=self.yt_dl.get_video_url( item[COL_ITEM]['player']['default'])
-            item[COL_ITEM]['mplayer_url']=url
-          url=item[COL_ITEM]['mplayer_url']
-          urllist.append(url)
-        self.player.play_url(urllist)
-        self.message.set_text(truncate("stopped playing playlist"))
+          url=self.yt_dl.get_video_url( item[COL_ITEM]['player']['default'])
+          if url.startswidth("http"):
+            urllist.append(url)
+          else:
+            self.message.set_text(truncate("failed to get url for "+item[COL_TITLE]))            
+        if len(urllist):
+          self.player.play_url(urllist)
+          self.message.set_text(truncate("stopped playing playlist"))
         self.playing=False
         gobject.timeout_add(2000, self.update_mesg)
         self.yt_dl.restart()
@@ -914,7 +913,7 @@ class TheTube(gtk.Window):
         self.player.player=p
         self.player.vo_driver=v
         self.yt_dl.use_http=True if p=='mplayer' else False
-        self.flash_message("changed video player to: "+p+" with "+v+" (hit alt/start to reset store)")
+        self.flash_message("changed video player to: "+p+" with "+v)
     
     def on_yt_fetcher(self):
         if self.yt_dl.yt_fetcher=="pafy":
