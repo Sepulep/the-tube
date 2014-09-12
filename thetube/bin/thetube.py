@@ -4,9 +4,10 @@ DOCSTRING="""
 General keyboard shortcuts:
       'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
       '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download, 'f'=set download folder, 'q'=quit
-      'm'=cycle through video players
 Playlist commands: 
       'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
+Advanced commands (it may be necessary to reset the store with alt/start)
+      'm'=cycle through video players, 'y'=switch youtube query library
 """
 
 import time 
@@ -914,12 +915,12 @@ class TheTube(gtk.Window):
         self.player.player=p
         self.player.vo_driver=v
         self.yt_dl.use_http=True if p=='mplayer' else False
-        self.flash_message("changed video player to: "+p+" with "+v+" (hit home to reset store)")
+        self.flash_message("changed video player to: "+p+" with "+v+" (hit alt/start to reset store)")
     
     def on_yt_fetcher(self):
         if self.yt_dl.yt_fetcher=="pafy":
           self.yt_dl.yt_fetcher="youtube-dl"
-        if self.yt_dl.yt_fetcher=="youtube-dl":
+        elif self.yt_dl.yt_fetcher=="youtube-dl":
           self.yt_dl.yt_fetcher="pafy"
         self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
           
@@ -952,6 +953,8 @@ class TheTube(gtk.Window):
           self.exitButton.emit("activate")
         if keyname in ["h","H"]:
           self.helpButton.emit("activate")
+        if keyname in ["Alt_R","Alt_L"]:
+          self.homeButton.emit("activate")
         if keyname in ["d","D"]:
           self.on_download()
         if keyname in ["f","F"]:

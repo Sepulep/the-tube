@@ -9,7 +9,7 @@
                    <title lang="en_US">The Tube</title>
            </titles>
            <descriptions>
-                   <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mpv.</description>
+                   <description lang="en_US">A freeware minimalistic youtube browser.</description>
            </descriptions>
    </package>
 
@@ -21,7 +21,7 @@
     <version major="0" minor="2" release="1" build="1"/>	      <!--This programs version-->
     <osversion major="1" minor="5" release="5" build="0"/>		<!--The minimum OS version required-->
 
-    <description lang="en_US">A freeware minimalistic youtube browser based on youtube-dl and mpv.</description>
+    <description lang="en_US">A freeware minimalistic youtube browser.</description>
 
     <icon src="./icon.png"/>
 
