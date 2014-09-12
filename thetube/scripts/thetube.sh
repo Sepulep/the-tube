@@ -27,6 +27,10 @@ SELECT=`zenity --list --width=360 --height=280 \
    FALSE "$OPTION3" \
    FALSE "$OPTION4"`
 
+if [[ $? -eq 1 ]]; then
+exit 1
+fi
+
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
 cd /mnt/utmp/thetube/bin/
