@@ -71,8 +71,7 @@ class ytdl(object):
         self.preload_ytdl=preload_ytdl
         self.use_http=use_http
         self.bandwidth=bandwidth
-        if self.yt_fetcher=="youtube-dl":
-          self.yt_dl=None
+        self.yt_dl=None
         self.restart()
 
     def restart(self):
