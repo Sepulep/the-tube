@@ -27,6 +27,7 @@ import atexit
 from optparse import OptionParser
 import operator
 import pafy
+import cPickle
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -70,24 +71,26 @@ class ytdl(object):
         self.preload_ytdl=preload_ytdl
         self.use_http=use_http
         self.bandwidth=bandwidth
-        self.yt_dl=None
+        self.preloaded_ytdl=None
         self.restart()
         self._url_cache=dict()
 
     def restart(self):
         if self.yt_fetcher=="youtube-dl" and self.preload_ytdl:
-          self.start_ytdl()
+          self.preloaded_ytdl=self.start_ytdl(force=True)
 
     def get_video_url(self,url):
         key=(url,self.use_http,self.bandwidth)
-        if key not in self._url_cache or 
-             not isinstance(self._url_cache[key],basestring) or
-             not self._url_cache[key].startswith("http"):        
+        if key not in self._url_cache or self._url_cache[key].startswith("FAIL"):
+          self._url_cache[key]="busy"
           if self.yt_fetcher=="youtube-dl":
             video_url=self.get_video_url_ytdl(url)
           if self.yt_fetcher=="pafy":
             video_url=self.get_video_url_pafy(url)
           self._url_cache[key]=video_url
+        else:            
+          while self._url_cache[key]=="busy":
+            time.sleep(0.1)
         return self._url_cache[key]
 
     def download_video(self,url, download_directory, progressbar):
@@ -96,26 +99,30 @@ class ytdl(object):
         else:
           self.download_video_ytdl(url, download_directory, progressbar)
 
-    def start_ytdl(self):
-        if self.yt_dl is not None:
-          self.yt_dl.terminate()
+    def start_ytdl(self,force=False):
+        if self.preloaded_ytdl is not None:
+          if not force:
+            yt_dl=self.preloaded_ytdl
+            self.preloaded_ytl=None
+            return yt_dl
+          else:
+            self.yt_dl.terminate()
         security='' if not self.use_http else '--prefer-insecure'
         bandwidth=self.ytdl_bandwidth_string()
         call = "./youtube-dl -g -f " + bandwidth + " " + security + " -a -"
         print call
-        self.yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
+        yt_dl = subprocess.Popen(call, stdout = subprocess.PIPE,stderr=subprocess.PIPE,
           stdin=subprocess.PIPE, shell=True)
-        atexit.register(kill_process,self.yt_dl)
+        atexit.register(kill_process,yt_dl)
+        return yt_dl
 
     def get_video_url_ytdl(self,url):
-        if self.yt_dl is None:
-          self.start_ytdl()
+        yt_dl=self.start_ytdl()
         
-        (url, err) = self.yt_dl.communicate(input=url)
-        if self.yt_dl.returncode != 0:
+        (url, err) = yt_dl.communicate(input=url)
+        if yt_dl.returncode != 0:
           sys.stderr.write(err)
           return "FAIL"
-        self.yt_dl=None
         return url
 
     def get_video_url_pafy(self,url):
@@ -867,7 +874,7 @@ class TheTube(gtk.Window):
     def play(self,url,title):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy buffering "+title))
         mplayer_url=self.yt_dl.get_video_url(url)
-        if mplayer_url.startswidth("http"):
+        if mplayer_url.startswith("http"):
           self.player.play_url([mplayer_url])
           self.message.set_text(truncate("stopped playing "+title))
         else:
@@ -881,7 +888,7 @@ class TheTube(gtk.Window):
         urllist=[]
         for item in playlist:
           url=self.yt_dl.get_video_url( item[COL_ITEM]['player']['default'])
-          if url.startswidth("http"):
+          if url.startswith("http"):
             urllist.append(url)
           else:
             self.message.set_text(truncate("failed to get url for "+item[COL_TITLE]))            
@@ -892,6 +899,18 @@ class TheTube(gtk.Window):
         gobject.timeout_add(2000, self.update_mesg)
         self.yt_dl.restart()
 
+    def on_save_playlist(self):
+        image=[]
+        def f(buf,data=None):
+          data.append(buf)
+          return True
+        for item in self.playlist:
+          item[1].save_to_callback(f,"png",user_data=image)
+        print len(image),''.join(image)
+#        f=open("playlist","wb")
+#        config=cPickle.dump(rowList,f)
+#        f.close()
+        
     def on_help(self,widget=None):
         self.infoView.get_buffer().set_text(DOCSTRING)
         self.on_info()
@@ -973,6 +992,8 @@ class TheTube(gtk.Window):
           self.on_clear()
         if keyname in ["i","I"]:
           self.on_info()          
+#        if keyname in ["w","W"]:
+#          self.on_save_playlist()          
         if keyname in ["2"]:
           self.button240.set_active(not self.button240.get_active())
         if keyname in ["3"]:
