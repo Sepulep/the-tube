@@ -1,12 +1,11 @@
 #!/usr/bin/python
 
-DOCSTRING="""General keyboard shortcuts:
-      'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results, 'o'=change order, 'enter'=play,
-      '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download, 'f'=set download folder, 'q'=quit
-Playlist commands: 
-      'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
-Advanced commands
-      'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home, reset & clear cache
+DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results,
+      'o'=change order, 'enter'=play, '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download,
+      'f'=set download folder, 'q'=quit
+Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
+Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache,
+      'u:user' in search searches for uploads from 'user'
 """
 
 import time 
@@ -244,80 +243,144 @@ class video_player(object):
           else:
             call.extend(['-vo',self.vo_driver,'--no-fixed-vo'])
         return call
-        
-def search_feed(terms):
-    def fetch_cb(start, maxresults, ordering):
-        url = 'https://gdata.youtube.com/feeds/api/videos'
-        query = {
-            'q': terms,
-            'v': 2,
-            'alt': 'jsonc',
-            'start-index': start,
-            'max-results': maxresults,
-            'orderby': ordering,
-        }
-        try:
-          sock=None
-          sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-          result=json.load(sock)
-        except:
-          result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
-        finally:  
-          if sock:
-            sock.close()
+
+class youtube_api(object):
+    def search_info(self,search):
+      result=dict()
+      if search==None or search=="":
         return result
-
-    return { 'fetch_cb': fetch_cb, 'description': 'search for "%s"' % (terms,) }
-
-
-def standard_feed(feed_name="most_popular"):
-    def fetch_cb(start, maxresults, ordering):
-        url = 'https://gdata.youtube.com/feeds/api/standardfeeds/%s' % (feed_name,)
-        query = {
-            'v': 2,
-            'alt': 'jsonc',
-            'start-index': start,
-            'max-results': maxresults,
-            'orderby': ordering,
-        }
-        try:
-          sock=None
-          sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-          result=json.load(sock)
-        except:
-          result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
-        finally:  
-          if sock:
-            sock.close()
+      search=search.replace("u:","user:").replace("pl:","playlist:").replace("rl:","related:")
+      search=search.replace(": ",":").replace(": ",":")
+      if "related:" in search:
+        vid=search[search.find("related:"):].split()[0][8:]
+        result["related"]=vid
+        result["terms"]=vid
         return result
+      if "playlist:" in search:
+        result["playlist"]=True
+        search=search.replace("playlist:","")
+      if "user:" in search:
+        user=search[search.find("user:"):].split()[0][5:]
+        result["user"]=user
+        search=search.replace("user:"+user,"")
+      if len(search):
+        result["terms"]=search
+      return result
+    
+    def get_feed(self,search=None):
+        search=self.search_info(search)
+        if not search:
+          return self.standard_feed()
+        elif "playlist" in search:
+          pass
+        elif "user" in search:
+          if "terms" in search:
+            return self.search_feed(search["terms"],search["user"])
+          else:
+            return self.user_feed(search["user"])
+        else:
+          return self.search_feed(search["terms"])
 
-    feed = { 'fetch_cb': fetch_cb, 'description': 'standard feed' }
+    def user_feed(self,user):
+        def fetch_cb(start, maxresults, ordering):
+            url = "https://gdata.youtube.com/feeds/api/users/%s/uploads" % user
+            query = {
+                'v': 2,
+                'alt': 'jsonc',
+                'start-index': start,
+                'max-results': maxresults,
+                'orderby': ordering,
+            }
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            finally:  
+              if sock:
+                sock.close()
+            return result
+        description = 'search for uploads by "%s"' % (user,)
+        return { 'fetch_cb': fetch_cb, 'description':  description }
+              
+    def search_feed(self,terms,user=None):
+        def fetch_cb(start, maxresults, ordering):
+            url = 'https://gdata.youtube.com/feeds/api/videos'
+            query = {
+                'q': terms,
+                'v': 2,
+                'alt': 'jsonc',
+                'start-index': start,
+                'max-results': maxresults,
+                'orderby': ordering,
+            }
+            if user:
+              query['author']=user
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            finally:  
+              if sock:
+                sock.close()
+            return result
+        description = 'search for "%s"' % (terms,)
+        if user: description=description + ' by: "%s"'%(user,) 
+        return { 'fetch_cb': fetch_cb, 'description': description }
+    
+    
+    def standard_feed(self,feed_name="most_popular"):
+        def fetch_cb(start, maxresults, ordering):
+            url = 'https://gdata.youtube.com/feeds/api/standardfeeds/%s' % (feed_name,)
+            query = {
+                'v': 2,
+                'alt': 'jsonc',
+                'start-index': start,
+                'max-results': maxresults,
+                'orderby': ordering,
+            }
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            finally:  
+              if sock:
+                sock.close()
+            return result
+    
+        feed = { 'fetch_cb': fetch_cb, 'description': 'standard feed' }
+    
+        if feed_name == 'most_viewed':
+            feed['description'] = 'most viewed'
+    
+        return feed
+    
+    def single_video_data(self,videoid):
+        def fetch_cb():
+            url = "https://gdata.youtube.com/feeds/api/videos/"+videoid
+            query = {
+                'v': 2,
+                'alt': 'jsonc'            
+            }
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except Exception as ex:
+              result=dict(data=dict())
+            finally:  
+              if sock:
+                sock.close()
+            return result
+    
+        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,) }
 
-    if feed_name == 'most_viewed':
-        feed['description'] = 'most viewed'
-
-    return feed
-
-def single_video_data(videoid):
-    def fetch_cb():
-        url = "https://gdata.youtube.com/feeds/api/videos/"+videoid
-        query = {
-            'v': 2,
-            'alt': 'jsonc'            
-        }
-        try:
-          sock=None
-          sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-          result=json.load(sock)
-        except Exception as ex:
-          result=dict(data=dict())
-        finally:  
-          if sock:
-            sock.close()
-        return result
-
-    return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,) }
-
+YT=youtube_api()
 
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer',yt_fetcher="youtube-dl"):
@@ -587,7 +650,7 @@ class TheTube(gtk.Window):
 
     def pull_description(self,item):
         time.sleep(3*random.random())
-        f=single_video_data(item['id'])['fetch_cb']
+        f=YT.single_video_data(item['id'])['fetch_cb']
         data=f()['data']
         if data.has_key('description'):
           item['description']=data['description']
@@ -617,10 +680,7 @@ class TheTube(gtk.Window):
 
         store=self.create_store()
 
-        if search == None:
-          feed=standard_feed()
-        else:
-          feed=search_feed(search)
+        feed=YT.get_feed(search)
 
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
 
@@ -900,16 +960,21 @@ class TheTube(gtk.Window):
         self.yt_dl.restart()
 
     def on_save_playlist(self):
-        image=[]
-        def f(buf,data=None):
-          data.append(buf)
-          return True
+
+#        def f(buf,data=None):
+#          data.append(buf)
+#          return True
+         
+        data=[]
         for item in self.playlist:
-          item[1].save_to_callback(f,"png",user_data=image)
-        print len(image),''.join(image)
-#        f=open("playlist","wb")
-#        config=cPickle.dump(rowList,f)
-#        f.close()
+#          image=[]
+#          item[1].save_to_callback(f,"png",user_data=image)
+#          image=''.join(image)
+          image=None
+          data.append([item[0],image,item[2],item[3],item[4]])
+        f=open("playlist","wb")
+        cPickle.dump(data,f)
+        f.close()
         
     def on_help(self,widget=None):
         self.infoView.get_buffer().set_text(DOCSTRING)
