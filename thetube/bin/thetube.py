@@ -94,9 +94,9 @@ class ytdl(object):
 
     def download_video(self,url, download_directory, progressbar):
         if self.yt_fetcher=="youtube-dl":
-          self.download_video_ytdl(url, download_directory, progressbar)
+          return self.download_video_ytdl(url, download_directory, progressbar)
         else:
-          self.download_video_ytdl(url, download_directory, progressbar)
+          return self.download_video_ytdl(url, download_directory, progressbar)
 
     def start_ytdl(self,force=False):
         if self.preloaded_ytdl is not None:
@@ -166,7 +166,7 @@ class ytdl(object):
             continue
           if out.find("has already been downloaded")>=0:  
             destination=out.split()[1]
-            return truncate(destination,NSTRING-17)+" already exists"
+            return truncate(destination,NSTRING-17)+" already exists", destination
           if out.find("Destination")>=0:
             destination=out.split()[2]
             progressbar.set_text(truncate(destination))
@@ -179,7 +179,7 @@ class ytdl(object):
           sys.stderr.write(err)
           raise RuntimeError('Error getting URL.')
         print "end"
-        return "download finished: "+ destination
+        return "download finished: "+ destination, destination
 
 class video_player(object):
     def __init__(self,player="mpv",novideo=False, fullscreen=False, vo_driver="xv",keep_aspect=True):
@@ -267,12 +267,18 @@ class youtube_api(object):
         result["terms"]=search
       return result
     
-    def get_feed(self,search=None):
+    def get_feed(self,search=None,playlist_id=None):
         search=self.search_info(search)
         if not search:
-          return self.standard_feed()
+          if playlist_id:            
+            return self.playlist_feed(playlist_id)
+          else:
+            return self.standard_feed()
         elif "playlist" in search:
-          pass
+          if "user" in search:
+            return self.playlist_search_feed(search["user"],user=True)
+          else:
+            return self.playlist_search_feed(search["terms"],user=False)
         elif "user" in search:
           if "terms" in search:
             return self.search_feed(search["terms"],search["user"])
@@ -302,7 +308,7 @@ class youtube_api(object):
                 sock.close()
             return result
         description = 'search for uploads by "%s"' % (user,)
-        return { 'fetch_cb': fetch_cb, 'description':  description }
+        return { 'fetch_cb': fetch_cb, 'description':  description, 'type' : "user" }
               
     def search_feed(self,terms,user=None):
         def fetch_cb(start, maxresults, ordering):
@@ -329,8 +335,40 @@ class youtube_api(object):
             return result
         description = 'search for "%s"' % (terms,)
         if user: description=description + ' by: "%s"'%(user,) 
-        return { 'fetch_cb': fetch_cb, 'description': description }
+        return { 'fetch_cb': fetch_cb, 'description': description, 'type' : "search" }
     
+    def playlist_search_feed(self,terms,user=False):
+        def fetch_cb(start, maxresults, ordering):
+            if user:
+              x = "/users/%s/playlists" % terms
+            else:
+              x = "/playlists/snippets"
+            url = "https://gdata.youtube.com/feeds/api%s" % x
+            query = {
+                'v': 2,
+                'alt': 'jsonc',
+                'start-index': start,
+                'max-results': maxresults,
+            }
+            if not user:
+              query['q']=terms
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            finally:  
+              if sock:
+                sock.close()
+            return result
+        description = 'playlist search for "%s"' % (terms,)
+        feedtype="playlist-search"
+        if user: 
+          description=description + ' by: "%s"'%(user,) 
+          feedtype="playlist-user"
+        return { 'fetch_cb': fetch_cb, 'description': description, 'type' : feed_type}
+
     
     def standard_feed(self,feed_name="most_popular"):
         def fetch_cb(start, maxresults, ordering):
@@ -353,13 +391,38 @@ class youtube_api(object):
                 sock.close()
             return result
     
-        feed = { 'fetch_cb': fetch_cb, 'description': 'standard feed' }
+        feed = { 'fetch_cb': fetch_cb, 'description': 'standard feed', 'type': "standard" }
     
         if feed_name == 'most_viewed':
             feed['description'] = 'most viewed'
     
         return feed
+        
+    def playlist_feed(self,playlist_id):
+        def fetch_cb(start, maxresults, ordering):
+            url = 'https://gdata.youtube.com/feeds/api/playlists/%s' % (playlist_id,)
+            query = {
+                'v': 2,
+                'alt': 'jsonc',
+                'start-index': start,
+                'max-results': maxresults,
+#                'orderby': ordering,
+            }
+            try:
+              sock=None
+              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+              result=json.load(sock)
+            except:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            finally:  
+              if sock:
+                sock.close()
+            return result
     
+        feed = { 'fetch_cb': fetch_cb, 'description': 'feed of playlist %s' % (playlist_id,), 'type' : "playlist" }
+
+        return feed
+        
     def single_video_data(self,videoid):
         def fetch_cb():
             url = "https://gdata.youtube.com/feeds/api/videos/"+videoid
@@ -378,7 +441,7 @@ class youtube_api(object):
                 sock.close()
             return result
     
-        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,) }
+        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,), 'type' : "single" }
 
 YT=youtube_api()
 
@@ -619,7 +682,7 @@ class TheTube(gtk.Window):
         return store
             
     def pull_image(self,url,store,row):
-        time.sleep(3*random.random())
+        time.sleep(2*random.random())
         a=None
         retry=0
         while True:
@@ -648,6 +711,14 @@ class TheTube(gtk.Window):
         cropped=pixbuf.subpixbuf(x,y,min(THUMBXSIZE,w-x),min(THUMBYSIZE,h-y))
         store.set(row, COL_PIXBUF, cropped)  
 
+    def pull_playlist_image(self,playlist_id,store,row):
+        time.sleep(2*random.random())
+        feed=YT.get_feed(playlist_id=playlist_id)
+        fc=feed['fetch_cb']
+        r=fc(1,1,"relevance")
+        url=r['data']['thumbnail']['sqDefault']
+        self.pull_image(url,store,row)
+
     def pull_description(self,item):
         time.sleep(3*random.random())
         f=YT.single_video_data(item['id'])['fetch_cb']
@@ -662,9 +733,8 @@ class TheTube(gtk.Window):
         t.daemon=True
         t.start()
 
-
     def set_store_background(self, search=None, page=1, ordering="relevance"):
-        store=self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
+        store=self.fetch_and_cache(search,page,ordering)
         self.ordering=ordering
         self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
@@ -676,18 +746,25 @@ class TheTube(gtk.Window):
         self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
 #        self.iconView.select_path(0)
     
+    def fetch_and_cache(self, search=None, page=1, ordering="relevance"):
+        return self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
+        
     def fetch_store(self, search=None, page=1, ordering="relevance"):
 
         store=self.create_store()
 
-        feed=YT.get_feed(search)
-
+        if ordering=="playlist":
+          feed=YT.get_feed(search=None,playlist_id=search)
+        else:
+          feed=YT.get_feed(search)
+        
+        
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
-
+        
         istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
         npp=f['data']['itemsPerPage']
-        last=istart-1+min(ntot,npp)
+        last=istart-1+min(ntot-istart,npp)
 
         if ntot>0:
           items= f['data']['items']
@@ -695,20 +772,36 @@ class TheTube(gtk.Window):
           if len(items)<NPERPAGE:
             ntot=len(items)
 
-          message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
+          if ordering=="playlist":
+            message=feed['description']+": showing %i - %i out of %i"%(istart,last,ntot)
+          else:
+            message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
   
-          for i,item in enumerate(items):
-            url=item['thumbnail']['sqDefault']
-            timestring=str(datetime.timedelta(seconds=item['duration']))
-            tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
-            row=store.append([item['title'], self.missing, item,tooltip,i])
-            t=threading.Thread(target=self.pull_image, args=(url,store,row))
-            t.daemon=True
-            t.start()
+          if not feed['description'].startswith("playlist"):
+  
+            for i,item in enumerate(items):
+              if 'video' in item:
+                item=item["video"]
+              url=item['thumbnail']['sqDefault']
+              timestring=str(datetime.timedelta(seconds=item['duration']))
+              tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
+              row=store.append([item['title'], self.missing, item,tooltip,i])
+              t=threading.Thread(target=self.pull_image, args=(url,store,row))
+              t.daemon=True
+              t.start()
+  
+              t=threading.Thread(target=self.pull_description, args=(item,))
+              t.daemon=True
+              t.start()
 
-            t=threading.Thread(target=self.pull_description, args=(item,))
-            t.daemon=True
-            t.start()
+          else:
+            for i,item in enumerate(items):
+              item['is_playlist']=True
+              tooltip="["+item['author']+"]["+str(item['size'])+" videos]"+item['title']
+              row=store.append([item['title'], self.missing, item,tooltip,i])
+              t=threading.Thread(target=self.pull_playlist_image, args=(item['id'],store,row))
+              t.daemon=True
+              t.start()
 
         else:
           message=feed['description']+": no results"
@@ -757,6 +850,7 @@ class TheTube(gtk.Window):
 
     def on_order(self,widget=None):
         search,page,ordering=self.current_key
+        if ordering=="playlist": return
         new_ordering=self.orderings[ (self.orderings.index(ordering)+1)%len(self.orderings)]
         self.set_store( search, 1, new_ordering)
       
@@ -770,19 +864,22 @@ class TheTube(gtk.Window):
         title = model[item][COL_TITLE]
         print "click on:", title
 
-        if self.playing:
-           print "ignore"
-           self.flash_cursor("red")
-           return
-        self.flash_cursor("green")
-        self.playing=True
-
-        url = model[item][COL_ITEM]['player']['default']
-        print 'Playing ' + url
-
-        t=threading.Thread(target=self.play, args=(url,title))
-        t.daemon=True
-        t.start()
+        if "is_playlist" in model[item][COL_ITEM]:
+          self.set_store( model[item][COL_ITEM]['id'], 1, "playlist")        
+        else:
+          if self.playing:
+             print "ignore"
+             self.flash_cursor("red")
+             return
+          self.flash_cursor("green")
+          self.playing=True
+  
+          url = model[item][COL_ITEM]['player']['default']
+          print 'Playing ' + url
+  
+          t=threading.Thread(target=self.play, args=(url,title))
+          t.daemon=True
+          t.start()
 
     def on_play_playlist(self, widget=None):
         if self.playing or len(self.playlist)==0:
@@ -877,11 +974,11 @@ class TheTube(gtk.Window):
            if url not in self.current_downloads:
              self.current_downloads.add(url)
              print 'downloading ' + url
-             t=threading.Thread(target=self.download, args=(url,title))
+             t=threading.Thread(target=self.download, args=(url,title),kwargs=dict(item=item))
              t.daemon=True
              t.start()
          
-    def download(self,url,title):
+    def download(self,url,title,item=None):
          progressbar=gtk.ProgressBar()
          progressbar.set_size_request(780,20)
          progressbar.modify_font(pango.FontDescription("sans 9"))
@@ -889,13 +986,15 @@ class TheTube(gtk.Window):
          self.vbox.pack_start(progressbar,False,False,0)
          progressbar.show()
          try:
-           result=self.yt_dl.download_video(url,self.download_directory,progressbar)
+           result,destination=self.yt_dl.download_video(url,self.download_directory,progressbar)
            self.message.set_text(truncate(result))
          except Exception as ex:
            print ex
            self.message.set_text("download "+truncate(title,NSTRING-16)+" failed")
          progressbar.destroy()
-         self.current_downloads.remove(url)         
+         self.current_downloads.remove(url)
+         if item is not None:
+           item["local_file"]=destination         
 
     def on_selection_changed(self, widget):
          items=widget.get_selected_items()
