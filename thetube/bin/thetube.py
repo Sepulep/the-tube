@@ -681,7 +681,8 @@ class TheTube(gtk.Window):
 #        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
         return store
             
-    def pull_image(self,url,store,row):
+    def pull_image(self,row):
+        url=row[COL_ITEM]['thumbnail']['sqDefault']
         time.sleep(2*random.random())
         a=None
         retry=0
@@ -709,15 +710,17 @@ class TheTube(gtk.Window):
         x=max(0,(w-THUMBXSIZE)/2+1)
         y=max(0,(h-THUMBYSIZE)/2+1)
         cropped=pixbuf.subpixbuf(x,y,min(THUMBXSIZE,w-x),min(THUMBYSIZE,h-y))
-        store.set(row, COL_PIXBUF, cropped)  
+#        store.set(row, COL_PIXBUF, cropped)
+        row[COL_PIXBUF]=cropped
+ 
 
-    def pull_playlist_image(self,playlist_id,store,row):
+    def pull_playlist_image(self,row):
         time.sleep(2*random.random())
-        feed=YT.get_feed(playlist_id=playlist_id)
+        feed=YT.get_feed(playlist_id=row[COL_ITEM]['id'])
         fc=feed['fetch_cb']
         r=fc(1,1,"relevance")
-        url=r['data']['thumbnail']['sqDefault']
-        self.pull_image(url,store,row)
+        row[COL_ITEM]['thumbnail']=r['data']['thumbnail']
+        self.pull_image(row)
 
     def pull_description(self,item):
         time.sleep(3*random.random())
@@ -733,8 +736,8 @@ class TheTube(gtk.Window):
         t.daemon=True
         t.start()
 
-    def set_store_background(self, search=None, page=1, ordering="relevance"):
-        store=self.fetch_and_cache(search,page,ordering)
+    def set_store_background(self, search=None, page=1, ordering="relevance",playlist_id=None):
+        store=self.fetch_and_cache(search,page,ordering,playlist_id)
         self.ordering=ordering
         self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
@@ -746,19 +749,15 @@ class TheTube(gtk.Window):
         self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
 #        self.iconView.select_path(0)
     
-    def fetch_and_cache(self, search=None, page=1, ordering="relevance"):
+    def fetch_and_cache(self, search=None, page=1, ordering="relevance",playlist_id=None):
         return self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
         
-    def fetch_store(self, search=None, page=1, ordering="relevance"):
+    def fetch_store(self, search=None, page=1, ordering="relevance", playlist_id=None):
 
         store=self.create_store()
 
-        if ordering=="playlist":
-          feed=YT.get_feed(search=None,playlist_id=search)
-        else:
-          feed=YT.get_feed(search)
-        
-        
+        feed=YT.get_feed(search=None,playlist_id=search)
+                
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
         
         istart=f['data']['startIndex']        
@@ -772,21 +771,20 @@ class TheTube(gtk.Window):
           if len(items)<NPERPAGE:
             ntot=len(items)
 
-          if ordering=="playlist":
+          if feed["type"] in ["playlist-search","playlist-user"]:
             message=feed['description']+": showing %i - %i out of %i"%(istart,last,ntot)
           else:
             message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
   
-          if not feed['description'].startswith("playlist"):
+          if not feed["type"] in ["playlist-search","playlist-user"]:
   
             for i,item in enumerate(items):
               if 'video' in item:
                 item=item["video"]
-              url=item['thumbnail']['sqDefault']
               timestring=str(datetime.timedelta(seconds=item['duration']))
               tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
               row=store.append([item['title'], self.missing, item,tooltip,i])
-              t=threading.Thread(target=self.pull_image, args=(url,store,row))
+              t=threading.Thread(target=self.pull_image, args=(row,))
               t.daemon=True
               t.start()
   
@@ -799,14 +797,14 @@ class TheTube(gtk.Window):
               item['is_playlist']=True
               tooltip="["+item['author']+"]["+str(item['size'])+" videos]"+item['title']
               row=store.append([item['title'], self.missing, item,tooltip,i])
-              t=threading.Thread(target=self.pull_playlist_image, args=(item['id'],store,row))
+              t=threading.Thread(target=self.pull_playlist_image, args=(row,))
               t.daemon=True
               t.start()
 
         else:
           message=feed['description']+": no results"
-          
-        store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last)
+        
+        store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last,type=feed["type"])
                   
         return store
     
