@@ -66,8 +66,8 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
-ytfeedkey=namedtuple("ytfeedkey",["search","page","ordering","playlist_id"])
-ytfeedkey.__new__.__defaults__=(None,1,"relevance",None)
+ytfeedkey=namedtuple("ytfeedkey",["search","ordering","playlist_id"])
+ytfeedkey.__new__.__defaults__=(None,"relevance",None)
 
 class ytdl(object):
     def __init__(self,yt_fetcher="youtube-dl",preload_ytdl=False,use_http=True,bandwidth="480p"):
@@ -676,12 +676,13 @@ class TheTube(gtk.Window):
     def reset_store(self):
         self.stores=dict()
         self.keys_for_stores=[]
-        pl_key=ytfeedkey("__playlist__",1,"",None)
+        pl_key=ytfeedkey("__playlist__","",None)
         self.stores[pl_key]=dict(store=self.create_store(),
-                        message=self.playlist_message, istart=1,ntot=0,last=0)
+                        message=self.playlist_message, ntot=0,
+                        key=pl_key)
         self.playlist=self.stores[pl_key]['store']
         self.playlist_clipboard=self.create_store()
-        self.set_store("Openpandora",1,"relevance")
+        self.set_store("Openpandora","relevance")
     
     def create_store(self):
         store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
@@ -739,8 +740,8 @@ class TheTube(gtk.Window):
           item['description']="no info found"
           print "empty description:",data  
     
-    def set_store(self, search=None,page=1,ordering="relevance",playlist_id=None):
-        key=ytfeedkey(search,page,ordering,playlist_id)
+    def set_store(self, search=None,ordering="relevance",playlist_id=None):
+        key=ytfeedkey(search,ordering,playlist_id)
         t=threading.Thread(target=self.set_store_background,args=(key,))
         t.daemon=True
         t.start()
@@ -754,46 +755,56 @@ class TheTube(gtk.Window):
         self.store=store
         self.current_key=key
 
-        self.backButton.set_sensitive(False if store['istart']==1 else True)    
-        self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
+        self.backButton.set_sensitive(False)# if store['istart']==1 else True)    
+        self.forwardButton.set_sensitive(False)# if store['last']>=store['ntot'] else True)    
 #        self.iconView.select_path(0)
     
     def fetch_and_cache(self, key):
-        if key in self.stores:
-          return self.stores[key]
-        else:
-          store=self.stores.setdefault( key, self.fetch_store(key))
+        if key not in self.stores:
+          self.stores[key]=self.new_store(key)
           self.keys_for_stores.append(key)
           if len(self.keys_for_stores)>MAX_STORE_SIZE:
             key=self.keys_for_stores.pop(0)
             self.stores.pop(key)
-          return store
-        
-    def fetch_store(self, key):
+          return self.stores[key]
+    
+    def new_store(self,key):
+        store=dict(store=self.create_store(),ntot=-1,page=0,key=key,message="uninit",type="uninit",
+         updating=False)
+        self.expand_store(store)
+        return store
+    
+    def expand_store_background(self,_store):
+        self.expand_store(_store)
+        self.feed_mesg=_store['message']() if callable(_store['message']) else _store['message']
+        self.update_mesg()
+    
+    def expand_store(self, _store):
 
-        search,page,ordering,playlist_id=key
+        if _store["updating"]: return 
+        page=_store['page']+1
+        store=_store['store']
+        key=_store['key']
 
-        store=self.create_store()
+        if _store['ntot']==len(store):
+          return
+
+        _store["updating"]=True
+        print "updating"
+
+        search,ordering,playlist_id=key
 
         feed=YT.get_feed(search=search,playlist_id=playlist_id)
                 
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
         
-        istart=f['data']['startIndex']        
         ntot=f['data']['totalItems']
-        npp=f['data']['itemsPerPage']
-        last=istart-1+min(ntot-istart,npp)
 
         if ntot>0:
           items= f['data']['items']
 
           if len(items)<NPERPAGE:
             ntot=len(items)
-
-          if feed["type"].startswith("playlist"):
-            message=feed['description']+": showing %i - %i out of %i"%(istart,last,ntot)
-          else:
-            message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
   
           if not feed["type"] in ["playlist-search","playlist-user"]:
   
@@ -820,12 +831,19 @@ class TheTube(gtk.Window):
               t.daemon=True
               t.start()
 
+        if ntot>0:
+          if feed["type"].startswith("playlist"):
+            message=feed['description']+": showing %i out of %i"%(len(store),ntot)
+          else:
+            message=feed['description']+": showing %i out of %i, ordered by %s"%(len(store),ntot,self.order_dict[ordering])
         else:
           message=feed['description']+": no results"
         
-        store=dict(store=store, message=message, istart=istart,ntot=ntot,last=last,type=feed["type"])
-                  
-        return store
+        _store['message']=message
+        _store['page']=page
+        _store['ntot']=ntot,
+        _store['type']=feed["type"]
+        _store['updating']=False
     
     def on_res(self,widget,res):
         if self.button480.get_active(): self.bandwidth="480p"
@@ -861,20 +879,22 @@ class TheTube(gtk.Window):
         self.filechooser.hide()
         
     def on_forward(self,widget=None):
-        search,page,ordering,playlist_id=self.current_key
-        if self.store['last']<self.store['ntot']:    
-          self.set_store( search, page+1, ordering, playlist_id )
+         pass
+#        search,page,ordering,playlist_id=self.current_key
+#        if self.store['last']<self.store['ntot']:    
+#          self.set_store( search, page+1, ordering, playlist_id )
 
     def on_order(self,widget=None):
-        search,page,ordering,playlist_id=self.current_key
-        if ordering=="playlist": return
+        search,ordering,playlist_id=self.current_key
+        if ordering=="": return
         new_ordering=self.orderings[ (self.orderings.index(ordering)+1)%len(self.orderings)]
-        self.set_store( search, 1, new_ordering,playlist_id)
+        self.set_store( search, new_ordering,playlist_id)
       
     def on_back(self,widget=None):
-        search,page,ordering,playlist_id=self.current_key
-        if self.store['istart']>1:    
-          self.set_store( search, page-1, ordering,playlist_id )
+        pass
+#        search,page,ordering,playlist_id=self.current_key
+#        if self.store['istart']>1:    
+#          self.set_store( search, page-1, ordering,playlist_id )
     
     def on_item_activated(self, widget, item):
         model = widget.get_model()
@@ -1121,16 +1141,30 @@ class TheTube(gtk.Window):
         elif self.yt_dl.yt_fetcher=="youtube-dl":
           self.yt_dl.yt_fetcher="pafy"
         self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
-          
+    
+    def check_store_range(self):
+#        last=self.iconView.get_visible_range()[1][0]+1
+        p=self.iconView.get_cursor()
+        if p:
+          last=(self.iconView.get_item_row(p[0])+1)*self.iconView.get_columns()
+          if last<200 and last>=len(self.store['store']):
+            print "fetch"
+            self.flash_message("fetching data")
+            self.expand_store_background(self.store)
+#            t=threading.Thread(target=self.expand_store_background, args=(self.store,))
+#            t.daemon=True
+#            t.start()
+              
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
 #        print "Key %s (%d) was pressed" % (keyname, event.keyval)
-#        print self.iconView.get_visible_range()
 #        p=self.iconView.get_cursor()
 #        print self.iconView.get_item_column(p[0]),self.iconView.get_item_row(p[0])
         if keyname in ["Up","Down"] and not self.iconView.is_focus():
           self.iconView.grab_focus()
           return True
+        if keyname in ["Down"]:
+          self.check_store_range()
         if keyname in ["Page_Down"]:
           self.forwardButton.emit("activate")
         if keyname in ["Page_Up"]:
