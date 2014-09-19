@@ -9,6 +9,7 @@ Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query lib
 """
 
 import time 
+from collections import namedtuple
 import random
 import gtk
 import pango
@@ -52,6 +53,8 @@ PRELOAD_YTDL=True
 
 NSTRING=110
 
+MAX_STORE_SIZE=100
+
 AVAILABLE_VIDEO_PLAYERS=[("mpv","x11"),("mpv","xv")]
 if subprocess.call(["which","mplayer"])==0:
   AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","xv"),("mplayer","omapfb")])
@@ -63,6 +66,8 @@ def kill_process(x):
   if x.poll() is None:
     x.kill()
 
+ytfeedkey=namedtuple("ytfeedkey",["search","page","ordering","playlist_id"])
+ytfeedkey.__new__.__defaults__=(None,1,"relevance",None)
 
 class ytdl(object):
     def __init__(self,yt_fetcher="youtube-dl",preload_ytdl=False,use_http=True,bandwidth="480p"):
@@ -367,7 +372,7 @@ class youtube_api(object):
         if user: 
           description=description + ' by: "%s"'%(user,) 
           feedtype="playlist-user"
-        return { 'fetch_cb': fetch_cb, 'description': description, 'type' : feed_type}
+        return { 'fetch_cb': fetch_cb, 'description': description, 'type' : feedtype}
 
     
     def standard_feed(self,feed_name="most_popular"):
@@ -670,9 +675,11 @@ class TheTube(gtk.Window):
 
     def reset_store(self):
         self.stores=dict()
-        self.stores[("__playlist__",1,"")]=dict(store=self.create_store(),
+        self.keys_for_stores=[]
+        pl_key=ytfeedkey("__playlist__",1,"",None)
+        self.stores[pl_key]=dict(store=self.create_store(),
                         message=self.playlist_message, istart=1,ntot=0,last=0)
-        self.playlist=self.stores[("__playlist__",1,"")]['store']
+        self.playlist=self.stores[pl_key]['store']
         self.playlist_clipboard=self.create_store()
         self.set_store("Openpandora",1,"relevance")
     
@@ -729,34 +736,46 @@ class TheTube(gtk.Window):
         if data.has_key('description'):
           item['description']=data['description']
         else:
-          print data  
+          item['description']="no info found"
+          print "empty description:",data  
     
-    def set_store(self, *args, **kwargs): #search=None, page=1, ordering="relevance"):
-        t=threading.Thread(target=self.set_store_background, args=args,kwargs=kwargs)
+    def set_store(self, search=None,page=1,ordering="relevance",playlist_id=None):
+        key=ytfeedkey(search,page,ordering,playlist_id)
+        t=threading.Thread(target=self.set_store_background,args=(key,))
         t.daemon=True
         t.start()
 
-    def set_store_background(self, search=None, page=1, ordering="relevance",playlist_id=None):
-        store=self.fetch_and_cache(search,page,ordering,playlist_id)
-        self.ordering=ordering
+    def set_store_background(self, key):
+        store=self.fetch_and_cache(key)
+        self.ordering=key.ordering
         self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
         self.iconView.set_model(store['store'])
         self.store=store
-        self.current_key=(search,page,ordering)
+        self.current_key=key
 
         self.backButton.set_sensitive(False if store['istart']==1 else True)    
         self.forwardButton.set_sensitive(False if store['last']>=store['ntot'] else True)    
 #        self.iconView.select_path(0)
     
-    def fetch_and_cache(self, search=None, page=1, ordering="relevance",playlist_id=None):
-        return self.stores.setdefault( (search,page,ordering), self.fetch_store(search,page,ordering))
+    def fetch_and_cache(self, key):
+        if key in self.stores:
+          return self.stores[key]
+        else:
+          store=self.stores.setdefault( key, self.fetch_store(key))
+          self.keys_for_stores.append(key)
+          if len(self.keys_for_stores)>MAX_STORE_SIZE:
+            key=self.keys_for_stores.pop(0)
+            self.stores.pop(key)
+          return store
         
-    def fetch_store(self, search=None, page=1, ordering="relevance", playlist_id=None):
+    def fetch_store(self, key):
+
+        search,page,ordering,playlist_id=key
 
         store=self.create_store()
 
-        feed=YT.get_feed(search=None,playlist_id=search)
+        feed=YT.get_feed(search=search,playlist_id=playlist_id)
                 
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
         
@@ -771,7 +790,7 @@ class TheTube(gtk.Window):
           if len(items)<NPERPAGE:
             ntot=len(items)
 
-          if feed["type"] in ["playlist-search","playlist-user"]:
+          if feed["type"].startswith("playlist"):
             message=feed['description']+": showing %i - %i out of %i"%(istart,last,ntot)
           else:
             message=feed['description']+": showing %i - %i out of %i, ordered by %s"%(istart,last,ntot,self.order_dict[ordering])
@@ -784,7 +803,7 @@ class TheTube(gtk.Window):
               timestring=str(datetime.timedelta(seconds=item['duration']))
               tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
               row=store.append([item['title'], self.missing, item,tooltip,i])
-              t=threading.Thread(target=self.pull_image, args=(row,))
+              t=threading.Thread(target=self.pull_image, args=(store[row],))
               t.daemon=True
               t.start()
   
@@ -797,7 +816,7 @@ class TheTube(gtk.Window):
               item['is_playlist']=True
               tooltip="["+item['author']+"]["+str(item['size'])+" videos]"+item['title']
               row=store.append([item['title'], self.missing, item,tooltip,i])
-              t=threading.Thread(target=self.pull_playlist_image, args=(row,))
+              t=threading.Thread(target=self.pull_playlist_image, args=(store[row],))
               t.daemon=True
               t.start()
 
@@ -826,7 +845,7 @@ class TheTube(gtk.Window):
                 self.search_store.append([text])
                 self.search_terms[text]=0
             else:
-                self.search_terms[text]=self.search_terms[text]+1      
+                self.search_terms[text]=self.search_terms[text]+1
         self.set_store(search=text,ordering=self.orderings[0])
         self.iconView.grab_focus()
         
@@ -842,20 +861,20 @@ class TheTube(gtk.Window):
         self.filechooser.hide()
         
     def on_forward(self,widget=None):
-        search,page,ordering=self.current_key
+        search,page,ordering,playlist_id=self.current_key
         if self.store['last']<self.store['ntot']:    
-          self.set_store( search, page+1, ordering )
+          self.set_store( search, page+1, ordering, playlist_id )
 
     def on_order(self,widget=None):
-        search,page,ordering=self.current_key
+        search,page,ordering,playlist_id=self.current_key
         if ordering=="playlist": return
         new_ordering=self.orderings[ (self.orderings.index(ordering)+1)%len(self.orderings)]
-        self.set_store( search, 1, new_ordering)
+        self.set_store( search, 1, new_ordering,playlist_id)
       
     def on_back(self,widget=None):
-        search,page,ordering=self.current_key
+        search,page,ordering,playlist_id=self.current_key
         if self.store['istart']>1:    
-          self.set_store( search, page-1, ordering )
+          self.set_store( search, page-1, ordering,playlist_id )
     
     def on_item_activated(self, widget, item):
         model = widget.get_model()
@@ -863,7 +882,7 @@ class TheTube(gtk.Window):
         print "click on:", title
 
         if "is_playlist" in model[item][COL_ITEM]:
-          self.set_store( model[item][COL_ITEM]['id'], 1, "playlist")        
+          self.set_store(playlist_id=model[item][COL_ITEM]['id'])        
         else:
           if self.playing:
              print "ignore"
@@ -1106,6 +1125,9 @@ class TheTube(gtk.Window):
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
 #        print "Key %s (%d) was pressed" % (keyname, event.keyval)
+#        print self.iconView.get_visible_range()
+#        p=self.iconView.get_cursor()
+#        print self.iconView.get_item_column(p[0]),self.iconView.get_item_row(p[0])
         if keyname in ["Up","Down"] and not self.iconView.is_focus():
           self.iconView.grab_focus()
           return True
