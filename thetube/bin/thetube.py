@@ -5,7 +5,7 @@ DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=searc
       'f'=set download folder, 'q'=quit
 Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
 Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache,
-      'u:user' in search searches for uploads from 'user'
+      'pl:' in search searches for playlists, 'u:user' in search searches for uploads from 'user'
 """
 
 import time 
@@ -53,7 +53,7 @@ PRELOAD_YTDL=True
 
 NSTRING=110
 
-MAX_STORES=20
+MAX_STORES=30
 MAX_STORE_SIZE=1000
 
 AVAILABLE_VIDEO_PLAYERS=[("mpv","x11"),("mpv","xv")]
@@ -251,6 +251,10 @@ class video_player(object):
         return call
 
 class youtube_api(object):
+
+    order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
+    orderings=["relevance","published","viewCount","rating"]
+
     def search_info(self,search):
       result=dict()
       if search==None or search=="":
@@ -469,9 +473,6 @@ class TheTube(gtk.Window):
         self.current_downloads=set()
         self.search_terms=config.setdefault("search_terms",dict())
 
-        self.ordering=0
-        self.order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
-        self.orderings=["relevance","published","viewCount","rating"]
 
         super(TheTube, self).__init__()        
         self.set_size_request(800, 480)
@@ -676,14 +677,15 @@ class TheTube(gtk.Window):
 
     def reset_store(self):
         self.stores=dict()
+        self.store=None
         self.keys_for_stores=[]
         pl_key=ytfeedkey("__playlist__","",None)
-        self.stores[pl_key]=dict(store=self.create_store(),
+        playlist=dict(store=self.create_store(),
                         message=self.playlist_message, ntot=0,
                         key=pl_key)
-        self.playlist=self.stores[pl_key]['store']
+        self.stores[pl_key]=playlist
+        self.playlist=playlist
         self.playlist_clipboard=self.create_store()
-        self.current_key=None
         self.set_store("Openpandora","relevance")
     
     def create_store(self):
@@ -749,17 +751,16 @@ class TheTube(gtk.Window):
 
     def set_store_background(self, key):
         store=self.fetch_and_cache(key)
-        self.ordering=key.ordering
         self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
         self.iconView.set_model(store['store'])
         self.store=store
-        self.current_key=key
  
         try:
           i=self.keys_for_stores.index(key)
-          b1=False if i<=0 else True
+          b1=False if i==0 else True
           b2=False if i==len(self.keys_for_stores)-1 else True
+          print i, len(self.keys_for_stores),b1,b2
         except:
           b1=b2=False
         self.backButton.set_sensitive(b1)    
@@ -769,9 +770,9 @@ class TheTube(gtk.Window):
     def fetch_and_cache(self, key):
         if key not in self.stores:
           self.stores[key]=self.new_store(key)
-          if self.current_key and not self.store==self.playlist:
-            i=self.keys_for_stores.index(self.current_key)
-            self.keys_for_stores.insert(i,key)
+          if self.store and not self.store==self.playlist:
+            i=self.keys_for_stores.index(self.store['key'])
+            self.keys_for_stores.insert(i+1,key)
           else:  
             self.keys_for_stores.append(key)
           if len(self.keys_for_stores)>MAX_STORES:
@@ -792,7 +793,8 @@ class TheTube(gtk.Window):
     
     def expand_store(self, _store):
 
-        if _store["updating"]: return 
+        if _store==self.playlist: return
+        if _store["updating"]: return
         page=_store['page']+1
         store=_store['store']
         key=_store['key']
@@ -801,7 +803,6 @@ class TheTube(gtk.Window):
           return
 
         _store["updating"]=True
-        print "updating"
 
         search,ordering,playlist_id=key
 
@@ -812,7 +813,7 @@ class TheTube(gtk.Window):
         ntot=f['data']['totalItems']
         _store['ntot']=ntot
 
-        if ntot>0:
+        if ntot>0 and 'items' in f['data']:
           items= f['data']['items']
 
           if len(items)<NPERPAGE:
@@ -823,6 +824,10 @@ class TheTube(gtk.Window):
             for i,item in enumerate(items):
               if 'video' in item:
                 item=item["video"]
+                
+              if not "duration" in item:
+                continue
+              
               timestring=str(datetime.timedelta(seconds=item['duration']))
               tooltip="["+item['uploader']+"]["+timestring+"]"+item['title']
               row=store.append([item['title'], self.missing, item,tooltip,i])
@@ -847,7 +852,7 @@ class TheTube(gtk.Window):
           if feed["type"].startswith("playlist"):
             message=feed['description']+": showing %i out of %i"%(len(store),_store['ntot'])
           else:
-            message=feed['description']+": showing %i out of %i, ordered by %s"%(len(store),_store['ntot'],self.order_dict[ordering])
+            message=feed['description']+": showing %i out of %i, ordered by %s"%(len(store),_store['ntot'],YT.order_dict[ordering])
         else:
           message=feed['description']+": no results"
         
@@ -875,7 +880,7 @@ class TheTube(gtk.Window):
                 self.search_terms[text]=0
             else:
                 self.search_terms[text]=self.search_terms[text]+1
-        self.set_store(search=text,ordering=self.orderings[0])
+        self.set_store(search=text,ordering=YT.orderings[0])
         self.iconView.grab_focus()
         
     def on_home(self, widget=None):
@@ -890,7 +895,7 @@ class TheTube(gtk.Window):
         self.filechooser.hide()
         
     def on_forward(self,widget=None):
-        i=self.keys_for_stores.index(self.current_key)
+        i=self.keys_for_stores.index(self.store['key'])
         key=self.keys_for_stores[i+1]
         self.set_store(*key)
 #        search,page,ordering,playlist_id=self.current_key
@@ -898,13 +903,13 @@ class TheTube(gtk.Window):
 #          self.set_store( search, page+1, ordering, playlist_id )
 
     def on_order(self,widget=None):
-        search,ordering,playlist_id=self.current_key
+        search,ordering,playlist_id=self.store['key']
         if ordering=="": return
-        new_ordering=self.orderings[ (self.orderings.index(ordering)+1)%len(self.orderings)]
+        new_ordering=YT.orderings[ (YT.orderings.index(ordering)+1)%len(YT.orderings)]
         self.set_store( search, new_ordering,playlist_id)
       
     def on_back(self,widget=None):
-        i=self.keys_for_stores.index(self.current_key)
+        i=self.keys_for_stores.index(self.store['key'])
         key=self.keys_for_stores[i-1]
         self.set_store(*key)
 #        search,page,ordering,playlist_id=self.current_key
@@ -934,31 +939,31 @@ class TheTube(gtk.Window):
           t.start()
 
     def on_play_playlist(self, widget=None):
-        if self.playing or len(self.playlist)==0:
+        if self.playing or len(self.playlist['store'])==0:
            print "ignore"
            return
         self.playing=True
        
         print 'Playing playlist'
 
-        t=threading.Thread(target=self.play_playlist, args=(self.playlist,))
+        t=threading.Thread(target=self.play_playlist, args=(self.playlist['store'],))
         t.daemon=True
         t.start()
 
     def playlist_message(self):
-        if len(self.playlist)==0:
+        if len(self.playlist['store'])==0:
           return "Playlist: empty"
         else:
-          nitem=len(self.playlist)
+          nitem=len(self.playlist['store'])
           time=0
-          for item in self.playlist:
+          for item in self.playlist['store']:
             time+=item[COL_ITEM]['duration']
           timestring=str(datetime.timedelta(seconds=time))
           return "Playlist: %i videos ["%nitem+timestring+"]"
 
     def on_list(self, widget=None):
-        if self.iconView.get_model()!=self.playlist:
-          self.prev_key=self.current_key
+        if self.iconView.get_model()!=self.playlist['store']:
+          self.prev_key=self.store['key']
           self.set_store("__playlist__","")
         else:
           self.set_store(*self.prev_key)
@@ -967,31 +972,51 @@ class TheTube(gtk.Window):
         print self.yt_dl.get_video_url( item['player']['default'])
 
     def set_playlist_label(self):
-        self.playlistButton.set_label(str(len(self.playlist)))
+        self.playlistButton.set_label(str(len(self.playlist['store'])))
+
+    def add_playlist_to_playlist(self,item):
+        playlist_id=item['id']
+        self.flash_message("adding %i videos of "%item['size']+truncate(item["title"],NSTRING-36)+" to playlist")
+        key=ytfeedkey(None,"relevance",playlist_id)
+        store=self.fetch_and_cache(key)
+        i=NPERPAGE
+        while i<store['ntot']:
+          i+=NPERPAGE
+          self.expand_store_background(store)
+        time.sleep(2)
+        for row in store['store']:
+          self.playlist['store'].append(row)
+
 
     def on_add(self,widget=None):
         model = self.iconView.get_model()
-        if model!=self.playlist:
+        if model!=self.playlist['store']:
           items=self.iconView.get_selected_items()
           if items:
             item=items[0]
             model = self.iconView.get_model()
-            row=model[item]
-            self.playlist.append(row)
-            self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
-            self.flash_cursor("blue")
-
-            t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
-            t.daemon=True
-            t.start()
+            if "is_playlist" in model[item][COL_ITEM]:
+              self.flash_cursor("blue")
+              t=threading.Thread(target=self.add_playlist_to_playlist, args=(model[item][COL_ITEM],))
+              t.daemon=True
+              t.start()            
+            else:
+              row=model[item]
+              self.playlist['store'].append(row)
+              self.flash_message("added "+truncate(model[item][COL_TITLE],NSTRING-18)+" to playlist")
+              self.flash_cursor("blue")
+  
+              t=threading.Thread(target=self.get_item_video_url, args=(row[COL_ITEM],))
+              t.daemon=True
+              t.start()
                        
-        elif model==self.playlist:
+        elif model==self.playlist['store']:
           if len(self.playlist_clipboard):
             items=self.iconView.get_selected_items()
             if items:
               item=items[0]
               row=model[item]
-              self.playlist.insert_before(model.get_iter(item),row=self.playlist_clipboard[0])
+              self.playlist['store'].insert_before(model.get_iter(item),row=self.playlist_clipboard[0])
               self.playlist_clipboard.clear()
               self.flash_message("pasted "+truncate(model[item][COL_TITLE],NSTRING-18)+" in playlist")          
         self.set_playlist_label()
@@ -999,19 +1024,19 @@ class TheTube(gtk.Window):
           
     def on_remove(self,widget=None):
         model = self.iconView.get_model()
-        if model==self.playlist:
+        if model==self.playlist['store']:
           items=self.iconView.get_selected_items()
           if items:
             item=items[0]
             self.playlist_clipboard.clear()
             self.playlist_clipboard.append(model[item])
-            self.playlist.remove(model.get_iter(item))
+            self.playlist['store'].remove(model.get_iter(item))
             self.feed_mesg=self.playlist_message()
             self.update_mesg()
         self.set_playlist_label()
 
     def on_clear(self):
-        self.playlist.clear()
+        self.playlist['store'].clear()
         self.set_playlist_label()
         self.feed_mesg=self.playlist_message()
         self.update_mesg()
@@ -1117,7 +1142,7 @@ class TheTube(gtk.Window):
 #          return True
          
         data=[]
-        for item in self.playlist:
+        for item in self.playlist['store']:
 #          image=[]
 #          item[1].save_to_callback(f,"png",user_data=image)
 #          image=''.join(image)
@@ -1158,17 +1183,18 @@ class TheTube(gtk.Window):
         self.flash_message("changed youtube query to: "+self.yt_dl.yt_fetcher)
     
     def check_store_range(self):
-        if len(self.store['store'])==self.store['ntot']:
+        if len(self.store['store'])==self.store['ntot'] or self.store==self.playlist:
           return False
-        last=self.iconView.get_visible_range()[1][0]+1
-        last=self.iconView.get_cursor()[0][0]+self.iconView.get_columns()        
-        if last<MAX_STORE_SIZE and last>=len(self.store['store']):
-          self.flash_message("** fetching data **")
-          self.expand_store_background(self.store)
-#          t=threading.Thread(target=self.expand_store_background, args=(self.store,))
-#          t.daemon=True
-#          t.start()
-          return True
+        cursor=self.iconView.get_cursor()
+        if cursor:
+          last=self.iconView.get_cursor()[0][0]+self.iconView.get_columns()        
+          if last<MAX_STORE_SIZE and last>=len(self.store['store']):
+            self.flash_message("** fetching data **")
+            self.expand_store_background(self.store)
+            #~ t=threading.Thread(target=self.expand_store_background, args=(self.store,))
+            #~ t.daemon=True
+            #~ t.start()
+            return True
               
     def on_key_press_event(self,widget, event):
         keyname = gtk.gdk.keyval_name(event.keyval)
