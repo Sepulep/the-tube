@@ -795,6 +795,14 @@ class TheTube(gtk.Window):
 
         if _store==self.playlist: return
         if _store["updating"]: return
+        
+        reset=False
+        if _store['store']==self.iconView.get_model():
+          cursor=self.iconView.get_cursor()
+          self.iconView.freeze_child_notify()
+          self.iconView.set_model(None)
+          reset=True
+        
         page=_store['page']+1
         store=_store['store']
         key=_store['key']
@@ -855,11 +863,19 @@ class TheTube(gtk.Window):
             message=feed['description']+": showing %i out of %i, ordered by %s"%(len(store),_store['ntot'],YT.order_dict[ordering])
         else:
           message=feed['description']+": no results"
-        
+                    
         _store['message']=message
         _store['page']=page
         _store['type']=feed["type"]
         _store['updating']=False
+
+        if reset:
+          self.iconView.set_model(_store['store'])
+          self.iconView.thaw_child_notify()
+          if cursor:
+            self.iconView.set_cursor(cursor[0])
+            self.iconView.select_path(cursor[0])
+
     
     def on_res(self,widget,res):
         if self.button480.get_active(): self.bandwidth="480p"
@@ -1190,10 +1206,10 @@ class TheTube(gtk.Window):
           last=self.iconView.get_cursor()[0][0]+self.iconView.get_columns()        
           if last<MAX_STORE_SIZE and last>=len(self.store['store']):
             self.flash_message("** fetching data **")
-            self.expand_store_background(self.store)
-            #~ t=threading.Thread(target=self.expand_store_background, args=(self.store,))
-            #~ t.daemon=True
-            #~ t.start()
+            #~ self.expand_store_background(self.store)
+            t=threading.Thread(target=self.expand_store_background, args=(self.store,))
+            t.daemon=True
+            t.start()
             return True
               
     def on_key_press_event(self,widget, event):
