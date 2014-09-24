@@ -473,7 +473,6 @@ class TheTube(gtk.Window):
         self.current_downloads=set()
         self.search_terms=config.setdefault("search_terms",dict())
 
-
         super(TheTube, self).__init__()        
         self.set_size_request(800, 480)
         self.set_position(gtk.WIN_POS_CENTER)
@@ -483,12 +482,11 @@ class TheTube(gtk.Window):
         if fullscreen:
           self.fullscreen()
           
-        vbox = gtk.VBox(False, 0)
-        self.vbox = vbox
+        self.vbox = gtk.VBox(False, 0)
        
         toolbar = gtk.HBox()
         toolbar.set_size_request(780,34)
-        vbox.pack_start(toolbar, False, False, 0)
+        self.vbox.pack_start(toolbar, False, False, 0)
         
         def stock_button(icon,signal):
           image = gtk.Image()
@@ -517,45 +515,40 @@ class TheTube(gtk.Window):
         self.backButton.set_sensitive(False)
         self.forwardButton.set_sensitive(False)
 
-        button480=gtk.RadioButton(None,"480p")
-        button360=gtk.RadioButton(button480,"360p")
-        button240=gtk.RadioButton(button480,"240p")
-        buttontv=gtk.CheckButton("keep aspect ")
-        
-        self.button480=button480
-        self.button360=button360
-        self.button240=button240
-        self.buttontv=buttontv
-                
-        button480.child.modify_font(pango.FontDescription("sans 9"))
-        button360.child.modify_font(pango.FontDescription("sans 9"))
-        button240.child.modify_font(pango.FontDescription("sans 9"))
-        buttontv.child.modify_font(pango.FontDescription("sans 9"))
+        self.button480=gtk.RadioButton(None,"480p")
+        self.button360=gtk.RadioButton(self.button480,"360p")
+        self.button240=gtk.RadioButton(self.button480,"240p")
+        self.buttontv=gtk.CheckButton("keep aspect ")
+                        
+        self.button480.child.modify_font(pango.FontDescription("sans 9"))
+        self.button360.child.modify_font(pango.FontDescription("sans 9"))
+        self.button240.child.modify_font(pango.FontDescription("sans 9"))
+        self.buttontv.child.modify_font(pango.FontDescription("sans 9"))
 
         self.buttontv.set_active(self.player.keep_aspect)
         self.button240.set_active(self.bandwidth=="240p")
         self.button360.set_active(self.bandwidth=="360p") 
         self.button480.set_active(self.bandwidth=="480p")
 
-        button480.connect("toggled", self.on_res,"480p")
-        button360.connect("toggled", self.on_res,"360p")
-        button240.connect("toggled", self.on_res,"240p")
-        buttontv.connect("toggled", self.on_aspect)
+        self.button480.connect("toggled", self.on_res,"480p")
+        self.button360.connect("toggled", self.on_res,"360p")
+        self.button240.connect("toggled", self.on_res,"240p")
+        self.buttontv.connect("toggled", self.on_aspect)
         
         playlistButton = gtk.Button()
-        playlistButton.set_size_request(28,32)
+        playlistButton.set_size_request(36,32)
         playlistButton.set_label("0")
         playlistButton.connect("clicked", self.on_list)        
         toolbar.pack_start(playlistButton,False,False,0)
         self.playlistButton=playlistButton
 
-        toolbar.pack_end(buttontv,False,False,0)
-        toolbar.pack_end(button240,False,False,0)
-        toolbar.pack_end(button360,False,False,0)
-        toolbar.pack_end(button480,False,False,0)
+        toolbar.pack_end(self.buttontv,False,False,0)
+        toolbar.pack_end(self.button240,False,False,0)
+        toolbar.pack_end(self.button360,False,False,0)
+        toolbar.pack_end(self.button480,False,False,0)
         
-        entry = gtk.Entry(150)
-        entry.modify_font(pango.FontDescription("sans 9"))
+        self.entry = gtk.Entry(150)
+        self.entry.modify_font(pango.FontDescription("sans 9"))
 
         completion = gtk.EntryCompletion()
         self.search_store = gtk.ListStore(str)
@@ -565,68 +558,61 @@ class TheTube(gtk.Window):
         completion.set_model(self.search_store)
         completion.set_popup_completion(False)
         completion.set_inline_completion(True)
-        entry.set_completion(completion)
+        self.entry.set_completion(completion)
         completion.set_text_column(0)
 
-        entry.connect("activate", self.on_search)
-        self.entry=entry
-        toolbar.pack_end(entry,True,True,0)
+        self.entry.connect("activate", self.on_search)
+        toolbar.pack_end(self.entry,True,True,0)
 
         self.missing= gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, False, 8, THUMBXSIZE,THUMBYSIZE)
         self.missing.fill(0x151515)
 
-        sw = gtk.ScrolledWindow()
-        sw.set_shadow_type(gtk.SHADOW_NONE)
-        sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
-#        vbox.pack_start(sw, True, True, 0)
+        self.infoView_sw = gtk.ScrolledWindow()
+        self.infoView_sw.set_shadow_type(gtk.SHADOW_NONE)
+        self.infoView_sw.set_policy(gtk.POLICY_NEVER, gtk.POLICY_AUTOMATIC)
 
         self.infoView=gtk.TextView()
         self.infoView.set_buffer(gtk.TextBuffer())
         self.infoView.set_size_request(780,100)
         self.infoView.modify_font(pango.FontDescription("sans 8"))
         self.infoView.set_wrap_mode(gtk.WRAP_WORD)
-        sw.set_no_show_all(True)
-        self.infoView_sw=sw
+        self.infoView_sw.set_no_show_all(True)
 
-        message=gtk.Label(" ")
-        message.set_single_line_mode(True)
-        message.set_size_request(780,20)
-        message.modify_font(pango.FontDescription("sans 9"))
-
-        self.message=message
+        self.message=gtk.Label(" ")
+        self.message.set_single_line_mode(True)
+        self.message.set_size_request(780,20)
+        self.message.modify_font(pango.FontDescription("sans 9"))
         
-        iconView = gtk.IconView()
-        iconView.set_row_spacing(0)
-        iconView.set_column_spacing(0)
-        iconView.set_columns(6)
-        iconView.set_border_width(0)
-        iconView.modify_base(gtk.STATE_NORMAL, gtk.gdk.Color("black"))
-        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color("light grey"))
+        self.iconView = gtk.IconView()
+        self.iconView.set_row_spacing(0)
+        self.iconView.set_column_spacing(0)
+        self.iconView.set_columns(6)
+        self.iconView.set_border_width(0)
+        self.iconView.modify_base(gtk.STATE_NORMAL, gtk.gdk.Color("black"))
+        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color("light grey"))
         
 
-#        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 0., blue = 0.))
-#        iconView.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(red = 1., green = 0., blue = 0.))
-#        iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
-#        iconView.modify_bg(gtk.STATE_PRELIGHT, gtk.gdk.Color(red = 0., green = 0., blue = 1.))
-#        iconView.modify_bg(gtk.STATE_INSENSITIVE, gtk.gdk.Color(red = 0., green = 1., blue = 1.))
+#        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 0., blue = 0.))
+#        self.iconView.modify_bg(gtk.STATE_ACTIVE, gtk.gdk.Color(red = 1., green = 0., blue = 0.))
+#        self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(red = 0., green = 1., blue = 0.))
+#        self.iconView.modify_bg(gtk.STATE_PRELIGHT, gtk.gdk.Color(red = 0., green = 0., blue = 1.))
+#        self.iconView.modify_bg(gtk.STATE_INSENSITIVE, gtk.gdk.Color(red = 0., green = 1., blue = 1.))
 
 
-        iconView.set_pixbuf_column(COL_PIXBUF)
-        iconView.set_selection_mode(gtk.SELECTION_SINGLE)
+        self.iconView.set_pixbuf_column(COL_PIXBUF)
+        self.iconView.set_selection_mode(gtk.SELECTION_SINGLE)
 
-        iconView.connect("item-activated", self.on_item_activated)
-        iconView.connect("selection-changed", self.on_selection_changed)
-        iconView.grab_focus()
-        self.iconView=iconView
+        self.iconView.connect("item-activated", self.on_item_activated)
+        self.iconView.connect("selection-changed", self.on_selection_changed)
+        self.iconView.grab_focus()
 
         self.infoView_sw.add(self.infoView)
         
-        self.vbox.pack_start(iconView, True, True, 0)
-        self.vbox.pack_end(sw,False,False,0)
-        self.vbox.pack_end(message,False,False,0)
+        self.vbox.pack_start(self.iconView, True, True, 0)
+        self.vbox.pack_end(self.infoView_sw,False,False,0)
+        self.vbox.pack_end(self.message,False,False,0)
 
-
-        self.add(vbox)
+        self.add(self.vbox)
         
         self.reset_store()
         
@@ -639,8 +625,6 @@ class TheTube(gtk.Window):
         self.show_all()
 
         self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
-#        gobject.timeout_add(4000, self.flash_message," Welcome to The Tube! (type 'h' for help)")
-#        gobject.timeout_add(2000, self.on_help)
 
     def reset_store(self):
         self.stores=dict()
