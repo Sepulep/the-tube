@@ -489,66 +489,33 @@ class TheTube(gtk.Window):
         toolbar = gtk.HBox()
         toolbar.set_size_request(780,34)
         vbox.pack_start(toolbar, False, False, 0)
+        
+        def stock_button(icon,signal):
+          image = gtk.Image()
+          image.set_from_stock(icon, gtk.ICON_SIZE_MENU)
+          button=gtk.Button()
+          button.add(image)
+          button.connect("clicked",signal)
+          return button
+        
+        self.helpButton=stock_button(gtk.STOCK_HELP, self.on_help)
+        self.backButton=stock_button(gtk.STOCK_GO_BACK,self.on_back)
+        self.forwardButton=stock_button(gtk.STOCK_GO_FORWARD, self.on_forward)
+        self.homeButton=stock_button(gtk.STOCK_HOME, self.on_home)
+        self.sortButton=stock_button(gtk.STOCK_SORT_ASCENDING,self.on_order)
+        self.dirButton=stock_button(gtk.STOCK_DIRECTORY,self.on_dir)
+        self.exitButton=stock_button(gtk.STOCK_QUIT,self.on_quit)
+ 
+        toolbar.pack_start(self.helpButton,False,False,0)
+        toolbar.pack_start(self.backButton,False,False,0)
+        toolbar.pack_start(self.forwardButton,False,False,0)
+        toolbar.pack_start(self.homeButton,False,False,0)
+        toolbar.pack_start(self.sortButton,False,False,0)
+        toolbar.pack_start(self.dirButton,False,False,0)
+        toolbar.pack_start(self.exitButton,False,False,0)
 
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_HELP, gtk.ICON_SIZE_MENU)
-        helpButton = gtk.Button()
-        helpButton.add(image)
-        toolbar.pack_start(helpButton,False,False,0)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_GO_BACK, gtk.ICON_SIZE_MENU)
-        backButton = gtk.Button()
-        backButton.add(image)
-        toolbar.pack_start(backButton,False,False,0)
-        backButton.set_sensitive(False)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_GO_FORWARD, gtk.ICON_SIZE_MENU)
-        forwardButton = gtk.Button()
-        forwardButton.add(image)
-        toolbar.pack_start(forwardButton,False,False,0)
-        forwardButton.set_sensitive(False)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_HOME, gtk.ICON_SIZE_MENU)
-        homeButton = gtk.Button()
-        homeButton.add(image)
-        toolbar.pack_start(homeButton,False,False,0)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_SORT_ASCENDING, gtk.ICON_SIZE_MENU)
-        sortButton = gtk.Button()
-        sortButton.add(image)
-        toolbar.pack_start(sortButton,False,False,0)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_DIRECTORY, gtk.ICON_SIZE_MENU)
-        dirButton = gtk.Button()
-        dirButton.add(image)
-        toolbar.pack_start(dirButton,False,False,0)
-
-        image = gtk.Image()
-        image.set_from_stock(gtk.STOCK_QUIT, gtk.ICON_SIZE_MENU)
-        exitButton = gtk.Button()
-        exitButton.add(image)
-        toolbar.pack_start(exitButton,False,False,0)
-
-        helpButton.connect("clicked", self.on_help)
-        homeButton.connect("clicked", self.on_home)
-        exitButton.connect("clicked", self.on_quit)
-        forwardButton.connect("clicked", self.on_forward)
-        backButton.connect("clicked", self.on_back)
-        sortButton.connect("clicked", self.on_order)
-        dirButton.connect("clicked", self.on_dir)        
-
-        self.homeButton=homeButton
-        self.exitButton=exitButton
-        self.forwardButton=forwardButton
-        self.backButton=backButton
-        self.helpButton=helpButton
-        self.sortButton=sortButton
-        self.dirButton=dirButton
+        self.backButton.set_sensitive(False)
+        self.forwardButton.set_sensitive(False)
 
         button480=gtk.RadioButton(None,"480p")
         button360=gtk.RadioButton(button480,"360p")
