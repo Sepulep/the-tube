@@ -754,12 +754,6 @@ class TheTube(gtk.Window):
         if _store==self.playlist: return
         if _store["updating"]: return
         
-        reset=False
-        if _store['store']==self.iconView.get_model():
-          cursor=self.iconView.get_cursor()
-          self.iconView.freeze_child_notify()
-          self.iconView.set_model(None)
-          reset=True
         
         page=_store['page']+1
         store=_store['store']
@@ -775,6 +769,13 @@ class TheTube(gtk.Window):
         feed=YT.get_feed(search=search,playlist_id=playlist_id)
                 
         f=feed['fetch_cb'](1+(page-1)*NPERPAGE,NPERPAGE, ordering)
+
+        reset=False
+        if _store['store']==self.iconView.get_model():
+          cursor=self.iconView.get_cursor()
+          self.iconView.freeze_child_notify()
+          self.iconView.set_model(None)
+          reset=True
         
         ntot=f['data']['totalItems']
         _store['ntot']=ntot
