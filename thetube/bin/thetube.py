@@ -682,7 +682,12 @@ class TheTube(gtk.Window):
         feed=YT.get_feed(playlist_id=row[COL_ITEM]['id'])
         fc=feed['fetch_cb']
         r=fc(1,1,"relevance")
-        row[COL_ITEM]['thumbnail']=r['data']['thumbnail']
+        try:
+          row[COL_ITEM]['thumbnail']=r['data']['thumbnail']
+        except:
+          print "fail on pull_playlist_image"
+          print r['data'].keys()
+
         self.pull_image(row)
 
     def pull_description(self,item):
@@ -704,7 +709,9 @@ class TheTube(gtk.Window):
         store=self.fetch_and_cache(key)
         self.feed_mesg=store['message']() if callable(store['message']) else store['message']
         self.update_mesg()
+        self.iconView.freeze_child_notify()
         self.iconView.set_model(store['store'])
+        self.iconView.thaw_child_notify()
         self.store=store
  
         try:
@@ -863,11 +870,10 @@ class TheTube(gtk.Window):
         
     def on_forward(self,widget=None):
         i=self.keys_for_stores.index(self.store['key'])
+        if (i+1)>=len(self.keys_for_stores):
+          return
         key=self.keys_for_stores[i+1]
         self.set_store(*key)
-#        search,page,ordering,playlist_id=self.current_key
-#        if self.store['last']<self.store['ntot']:    
-#          self.set_store( search, page+1, ordering, playlist_id )
 
     def on_order(self,widget=None):
         search,ordering,playlist_id=self.store['key']
@@ -877,11 +883,10 @@ class TheTube(gtk.Window):
       
     def on_back(self,widget=None):
         i=self.keys_for_stores.index(self.store['key'])
+        if (i-1)<0:
+          return
         key=self.keys_for_stores[i-1]
         self.set_store(*key)
-#        search,page,ordering,playlist_id=self.current_key
-#        if self.store['istart']>1:    
-#          self.set_store( search, page-1, ordering,playlist_id )
     
     def on_item_activated(self, widget, item):
         model = widget.get_model()
@@ -1018,7 +1023,7 @@ class TheTube(gtk.Window):
            if url not in self.current_downloads:
              self.current_downloads.add(url)
              print 'downloading ' + url
-             t=threading.Thread(target=self.download, args=(url,title),kwargs=dict(item=item))
+             t=threading.Thread(target=self.download, args=(url,title),kwargs=dict(item=model[item][COL_ITEM]))
              t.daemon=True
              t.start()
          
