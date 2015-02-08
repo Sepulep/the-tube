@@ -5,7 +5,7 @@ DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=searc
       'f'=set download folder, 'q'=quit
 Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
 Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache,
-      'pl:' in search searches for playlists, 'u:user' in search searches for uploads from 'user'
+Special search strings: 'pl:' search for playlists, 'u:user' search for uploads from 'user'
 """
 
 import time 
@@ -250,6 +250,31 @@ class video_player(object):
             call.extend(['-vo',self.vo_driver,'--no-fixed-vo'])
         return call
 
+class dummy_api(object):
+    order_dict=dict(relevance="relevance")
+    orderings=["relevance"]
+    def get_feed(self,search=None,playlist_id=None):
+      def fetch_cb(start, maxresults, ordering):
+        time.sleep(0.5)
+        if start>1000:
+          result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception="dummy err")
+          return result
+        items=[]
+        for i in range(start,min(start+maxresults,1001)):
+          item=dict(duration=10,uploader="none",title="dummy"+str(i),id="dummy_id",thumbnail=dict(sqDefault="none"))
+          items.append(item)
+        data=dict(totalItems=1000,startIndex=start,itemsPerPage=NPERPAGE,items=items)
+        result=dict(data=data)
+        return result
+      return  { 'fetch_cb': fetch_cb, 'description': "dummy", 'type' : "search" } 
+    def single_video_data(self,id_):
+      def fetch_cb():
+        data=dict()
+        result=dict(data=data)
+        return result
+      return  { 'fetch_cb': fetch_cb, 'description': 'data for dummy', 'type' : "single" } 
+
+
 class youtube_api(object):
 
     order_dict=dict(relevance="relevance",published="last uploaded",viewCount="most viewed",rating="rating")
@@ -312,7 +337,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -338,7 +363,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -367,7 +392,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -395,7 +420,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -423,7 +448,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -454,6 +479,7 @@ class youtube_api(object):
         return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,), 'type' : "single" }
 
 YT=youtube_api()
+#~ YT=dummy_api()
 
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer',yt_fetcher="youtube-dl"):
