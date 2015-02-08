@@ -311,8 +311,8 @@ class youtube_api(object):
               sock=None
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
-            except:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            except Exception as ex:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
             finally:  
               if sock:
                 sock.close()
@@ -337,8 +337,8 @@ class youtube_api(object):
               sock=None
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
-            except:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            except Exception as ex:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
             finally:  
               if sock:
                 sock.close()
@@ -366,8 +366,8 @@ class youtube_api(object):
               sock=None
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
-            except:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            except Exception as ex:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
             finally:  
               if sock:
                 sock.close()
@@ -394,8 +394,8 @@ class youtube_api(object):
               sock=None
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
-            except:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            except Exception as ex:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
             finally:  
               if sock:
                 sock.close()
@@ -422,8 +422,8 @@ class youtube_api(object):
               sock=None
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
-            except:
-              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0))
+            except Exception as ex:
+              result=dict(data=dict(totalItems=0,startIndex=0,itemsPerPage=0,exception=str(ex)))
             finally:  
               if sock:
                 sock.close()
@@ -445,7 +445,7 @@ class youtube_api(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict())
+              result=dict(data=dict(),exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -752,7 +752,9 @@ class TheTube(gtk.Window):
     def expand_store(self, _store):
 
         if _store==self.playlist: return
-        if _store["updating"]: return
+        if _store["updating"]:
+          print "already updating"
+          return
         
         
         page=_store['page']+1
@@ -760,6 +762,7 @@ class TheTube(gtk.Window):
         key=_store['key']
 
         if _store['ntot']==len(store):
+          print "max store reached"
           return
 
         _store["updating"]=True
@@ -782,9 +785,6 @@ class TheTube(gtk.Window):
 
         if ntot>0 and 'items' in f['data']:
           items= f['data']['items']
-
-          if len(items)<NPERPAGE:
-            ntot=len(items)
   
           if not feed["type"] in ["playlist-search","playlist-user"]:
   
