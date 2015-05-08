@@ -36,7 +36,8 @@ COL_TITLE = 0
 COL_PIXBUF = 1
 COL_ITEM = 2
 COL_TOOLTIP = 3
-COL_ORDER =4
+#COL_ORDER =4
+STORE_COLUMNS=(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
 
 THUMBXSIZE=116
 THUMBYSIZE=90
@@ -666,7 +667,7 @@ class TheTube(gtk.Window):
         self.set_store("Openpandora","relevance")
     
     def create_store(self):
-        store = gtk.ListStore(str, gtk.gdk.Pixbuf, gobject.TYPE_PYOBJECT, str,int)
+        store = gtk.ListStore(*STORE_COLUMNS)
 #        store.set_sort_column_id(COL_ORDER, gtk.SORT_ASCENDING)
         return store
             
