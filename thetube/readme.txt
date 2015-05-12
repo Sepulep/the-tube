@@ -7,6 +7,10 @@ the included youtube-dl should that become necessary. Also, an option
 to revert back youtube-dl is included. Note that by default, The Tube 
 now uses the pafy library instead (but you can toggle with 'y').
 
+There is also an option to change the API key (can be obtained from 
+google, generate one with the youtube v3 API enabled), or revert back
+to the key included in the pnd.
+
 You can use the mouse or the keyboard for input. Press h or the help 
 button to get help on the keyboard shortcuts. Videos can be played from 
 the browser by double clicking or pressing enter, or downloaded by 
@@ -27,7 +31,7 @@ The mpv player is included. It has been patched to use the neon optimized
 yuv to rgb565 converter from mozilla firefox (mozilla.org) in case the 
 x11 driver is used. This is the default and recommended, even if it may
 benefit from a little overclocking on CC and Rebirth pandoras as it 
-allows for seamless plailist play and tv-out (use main layer)..
+allows for seamless playlist play and tv-out (use main layer)..
 
 youtube-dl: rg3.github.io/youtube-dl/
 mplayer: www.mplayerhq.hu/
