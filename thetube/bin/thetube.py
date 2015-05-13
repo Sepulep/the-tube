@@ -71,6 +71,23 @@ def kill_process(x):
 ytfeedkey=namedtuple("ytfeedkey",["search","ordering","playlist_id"])
 ytfeedkey.__new__.__defaults__=(None,"relevance",None)
 
+class configuration_manager(object):
+    @staticmethod
+    def read_config():
+        try:
+          f=open(os.getenv("HOME")+"/.thetube","r")
+          config=json.load(f)
+          f.close()
+        except:
+          config=dict()
+        return config    
+          
+    @staticmethod      
+    def write_config(config):
+          f=open(os.getenv("HOME")+"/.thetube","w")
+          config=json.dump(config,f,indent=4)
+          f.close()
+
 class ytdl(object):
     def __init__(self,yt_fetcher="youtube-dl",preload_ytdl=False,use_http=True,bandwidth="480p"):
         self.yt_fetcher=yt_fetcher
@@ -505,7 +522,7 @@ YT=youtube_api_v3()
 
 class TheTube(gtk.Window): 
     def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer',yt_fetcher="youtube-dl"):
-        config=self.read_config()
+        config=configuration_manager.read_config()
 
         self.player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
 
@@ -1291,26 +1308,12 @@ class TheTube(gtk.Window):
           self.button480.set_active(not self.button480.get_active())
 #        if keyname in ["t","T"]:
 #          self.buttontv.set_active(not self.buttontv.get_active())
-
-    def read_config(self):
-        try:
-          f=open(os.getenv("HOME")+"/.thetube","r")
-          config=json.load(f)
-          f.close()
-        except:
-          config=dict()
-        return config    
-          
-    def write_config(self,config):
-          f=open(os.getenv("HOME")+"/.thetube","w")
-          config=json.dump(config,f,indent=4)
-          f.close()
           
     def on_quit(self, widget=None):
         search_terms=dict(sorted(self.search_terms.iteritems(), key=operator.itemgetter(1))[-100:])
         config=dict(download_directory=self.download_directory,
                           bandwidth=self.bandwidth,search_terms=search_terms)      
-        self.write_config(config)
+        configuration_manager.write_config(config)
         ts=threading.enumerate()
         for t in ts[1:]:
           if t.isAlive():
