@@ -16,7 +16,7 @@ ldd /mnt/utmp/thetube/bin/mpv
 #fi
 
 OPTION1="run The Tube"
-#OPTION2="run The Tube (for TV out)"
+OPTION2="run The Tube clipboard player"
 OPTION3="update youtube-dl"
 OPTION4="revert youtube-dl to pnd version"
 OPTION5="enter new API key"
@@ -26,6 +26,7 @@ SELECT=`zenity --list --width=360 --height=280 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
+   FALSE "$OPTION2" \
    FALSE "$OPTION3" \
    FALSE "$OPTION4" \
    FALSE "$OPTION5" \
@@ -42,7 +43,9 @@ python thetube.py -f -p -v mpv -d x11 -y pafy
 fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
-python thetube.py -f -p -v mpv -d x11 -y pafy
+zenity --info --text="The Tube clipboard player: plays youtube links copied to the clipboard (ctrl-c) automagically until 'stop' is copied to the clipboard"
+python clipplayer.py -f -p -v mpv -d x11 -y pafy
+zenity --info --text="The Tube clipboard player has shutdown"
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/

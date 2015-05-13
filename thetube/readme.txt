@@ -11,6 +11,11 @@ There is also an option to change the API key (can be obtained from
 google, generate one with the youtube v3 API enabled), or revert back
 to the key included in the pnd.
 
+You can also start an experimental background service that will play
+youtube links copied to the clipboard (ctrl-c) automagically (it works by
+polling the clipboard). This obviously interferes with the normal function
+of the clipboard! copy "stop" to the clipboard to stop...
+
 You can use the mouse or the keyboard for input. Press h or the help 
 button to get help on the keyboard shortcuts. Videos can be played from 
 the browser by double clicking or pressing enter, or downloaded by 
