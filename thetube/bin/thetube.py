@@ -4,7 +4,7 @@ DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=searc
       'o'=change order, 'enter'=play, '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download,
       'f'=set download folder, 'q'=quit
 Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
-Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache,
+Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache, 'Z'=set new start screen
 Special search strings: 'pl:' search for playlists, 'u:user' search for uploads from 'user'
 """
 
@@ -528,6 +528,7 @@ class TheTube(gtk.Window):
 
         self.bandwidth=config.setdefault("bandwidth","360p")
         self.use_http=True if player=='mplayer' else False
+        self.default_key=config.setdefault("default_key",ytfeedkey("Openpandora","relevance",None))
 
         self.yt_dl=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
           bandwidth=self.bandwidth,use_http=self.use_http)
@@ -702,7 +703,7 @@ class TheTube(gtk.Window):
         self.stores[pl_key]=playlist
         self.playlist=playlist
         self.playlist_clipboard=self.create_store()
-        self.set_store("Openpandora","relevance")
+        self.set_store(*self.default_key)
     
     def create_store(self):
         store = gtk.ListStore(*STORE_COLUMNS)
@@ -1298,6 +1299,8 @@ class TheTube(gtk.Window):
           self.on_clear()
         if keyname in ["i","I"]:
           self.on_info()          
+        if keyname in ["Z"]:
+          self.default_key=self.store["key"]          
 #        if keyname in ["w","W"]:
 #          self.on_save_playlist()          
         if keyname in ["2"]:
@@ -1312,7 +1315,8 @@ class TheTube(gtk.Window):
     def on_quit(self, widget=None):
         search_terms=dict(sorted(self.search_terms.iteritems(), key=operator.itemgetter(1))[-100:])
         config=dict(download_directory=self.download_directory,
-                          bandwidth=self.bandwidth,search_terms=search_terms)      
+                          bandwidth=self.bandwidth,search_terms=search_terms,
+                          default_key=self.default_key)      
         configuration_manager.write_config(config)
         ts=threading.enumerate()
         for t in ts[1:]:
