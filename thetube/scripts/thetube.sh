@@ -43,7 +43,8 @@ python thetube.py -f -p -v mpv -d x11 -y pafy
 fi
 if [ "$SELECT" == "$OPTION2" ]; then
 cd /mnt/utmp/thetube/bin/
-zenity --info --text="The Tube clipboard player: plays youtube links copied to the clipboard (ctrl-c) automagically until 'stop' is copied to the clipboard"
+zenity --info --text="The Tube clipboard player: plays youtube links copied to the clipboard (ctrl-c) automagically until 'stop' is copied to the clipboard" \
+  --timeout=5 &
 python clipplayer.py -f -p -v mpv -d x11 -y pafy
 zenity --info --text="The Tube clipboard player has shutdown"
 fi

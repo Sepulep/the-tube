@@ -1,4 +1,5 @@
 import time
+import os
 from subprocess import call,Popen,PIPE
 from optparse import OptionParser
 
@@ -23,7 +24,8 @@ class LocalClipboard(object):
       import gtk
       self.gtk=gtk
       self.has_gtk=True
-    except:
+    except Exception as ex:
+      print ex
       self.has_gtk=False
     if self.has_gtk:
       self.get=self.get_gtk
@@ -66,30 +68,49 @@ class LocalClipboard(object):
     cb = self.gtk.Clipboard( selection=self.selections[sel].upper() )
     cb.set_text(data)
 
+
+def zenity_error(data):
+  proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
+  proc.communicate(data)
+
+
 def clipplayer(fullscreen=False,preload_ytdl=False,vo_driver='xv',
                player="mpv",yt_fetcher="pafy",magic_string="stop"):
   config=configuration_manager.read_config()
 
   bandwidth=config.setdefault("bandwidth","360p")
   use_http=True if player=='mplayer' else False
-                 
+
   player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
   yt=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
           bandwidth=bandwidth,use_http=use_http)
 
   c=LocalClipboard(all_selections=True)
-  if c.get(sel=2).startswith(magic_string): c.set(' ',sel=2)
+  c.set('stop',sel=2)
+  time.sleep(0.6)
+  c.set(' ',sel=2)
   s=""  
+  sold=""
   while not s.startswith(magic_string):
+    if s!=sold:
+      if s.lstrip().startswith("http"):
+        #~ i=s.index("v=")
+        c.set("retrieving video url of "+s.lstrip())
+        try:
+          url=yt.get_video_url(s)#[i+2:i+13])
+        except Exception as ex:
+          url="FAIL"
+          zenity_error("The Tube playback failure: "+str(ex))
+        if not url.startswith("FAIL"):
+          player.play_url([url])
+          c.set("done playing (copy 'stop' to the clipboard to stop The Tube)",sel=2)
+        else:
+          c.set(url+"(copy 'stop' to the clipboard to stop The Tube)",sel=2)
+        yt.restart()
+
+    time.sleep(0.5)
     sold=s
     s=c.get(sel=2)
-    if s!=sold:      
-      if s.lstrip().startswith("http"):
-        i=s.index("v=")
-        url=yt.get_video_url(s[i+2:i+13])
-        player.play_url([url])
-    time.sleep(0.5)
-  print s
 
 def new_option_parser():
     result = OptionParser(usage="usage: %prog [options]")

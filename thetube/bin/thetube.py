@@ -126,10 +126,10 @@ class ytdl(object):
         if self.preloaded_ytdl is not None:
           if not force:
             yt_dl=self.preloaded_ytdl
-            self.preloaded_ytl=None
+            self.preloaded_ytdl=None
             return yt_dl
           else:
-            self.yt_dl.terminate()
+            self.preloaded_ytdl.terminate()
         security='' if not self.use_http else '--prefer-insecure'
         bandwidth=self.ytdl_bandwidth_string()
         call = "./youtube-dl -g -f " + bandwidth + " " + security + " -a -"
@@ -1238,10 +1238,10 @@ class TheTube(gtk.Window):
           last=self.iconView.get_cursor()[0][0]+self.iconView.get_columns()        
           if last<MAX_STORE_SIZE and last>=len(self.store['store']):
             self.flash_message("** fetching data **")
-            #~ self.expand_store_background(self.store)
-            t=threading.Thread(target=self.expand_store_background, args=(self.store,))
-            t.daemon=True
-            t.start()
+            self.expand_store_background(self.store)
+            #~ t=threading.Thread(target=self.expand_store_background, args=(self.store,))
+            #~ t.daemon=True
+            #~ t.start()
             return True
               
     def on_key_press_event(self,widget, event):
@@ -1300,7 +1300,8 @@ class TheTube(gtk.Window):
         if keyname in ["i","I"]:
           self.on_info()          
         if keyname in ["Z"]:
-          self.default_key=self.store["key"]          
+          self.default_key=self.store["key"]
+          self.flash_message("setting starting screen")
 #        if keyname in ["w","W"]:
 #          self.on_save_playlist()          
         if keyname in ["2"]:
