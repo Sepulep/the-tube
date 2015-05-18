@@ -46,7 +46,7 @@ ENCODING480p=[35]
 ENCODING360p=[18]
 ENCODING240p=[36,5]
 
-NPERPAGE=24
+NPERPAGE=48
 
 FULLSCREEN=False
 
@@ -712,7 +712,7 @@ class TheTube(gtk.Window):
             
     def pull_image(self,row):
         url=row[COL_ITEM]['snippet']['thumbnails']['default']['url']
-        time.sleep(random.random())
+        time.sleep(random.random()/2)
         a=None
         retry=0
         while True:
@@ -744,7 +744,7 @@ class TheTube(gtk.Window):
  
 
     def pull_playlist_image(self,row):
-        time.sleep(random.random())
+        time.sleep(random.random()/2)
         feed=YT.get_feed(playlist_id=row[COL_ITEM]['id'])
         fc=feed['fetch_cb']
         r=fc(1,1,"relevance")
@@ -757,7 +757,7 @@ class TheTube(gtk.Window):
         self.pull_image(row)
 
     def pull_description(self,item):
-        time.sleep(random.random())
+        time.sleep(random.random()/2)
         f=YT.single_video_data(item['id'])['fetch_cb']
         data=f()['data']
         if data.has_key('description'):
@@ -767,9 +767,10 @@ class TheTube(gtk.Window):
     
     def set_store(self, search=None,ordering="relevance",playlist_id=None):
         key=ytfeedkey(search,ordering,playlist_id)
-        t=threading.Thread(target=self.set_store_background,args=(key,))
-        t.daemon=True
-        t.start()
+        gtk.idle_add(self.set_store_background,key)
+        #~ t=threading.Thread(target=self.set_store_background,args=(key,))
+        #~ t.daemon=True
+        #~ t.start()
 
     def set_store_background(self, key):
         store=self.fetch_and_cache(key)
@@ -846,8 +847,8 @@ class TheTube(gtk.Window):
         reset=False
         if _store['store']==self.iconView.get_model():
           cursor=self.iconView.get_cursor()
-          self.iconView.freeze_child_notify()
-          self.iconView.set_model(None)
+          #~ self.iconView.freeze_child_notify()
+          #~ self.iconView.set_model(None)
           reset=True
         
         #~ print f
@@ -901,11 +902,11 @@ class TheTube(gtk.Window):
         _store['updating']=False
 
         if reset:
-          self.iconView.set_model(_store['store'])
-          self.iconView.thaw_child_notify()
+          #~ self.iconView.set_model(_store['store'])
+          #~ self.iconView.thaw_child_notify()
           if cursor:
-            self.iconView.set_cursor(cursor[0])
-            self.iconView.select_path(cursor[0])
+            self.iconView.set_cursor(cursor[0][0]+self.iconView.get_columns())
+            self.iconView.select_path(cursor[0][0]+self.iconView.get_columns())
 
     
     def on_res(self,widget,res):
@@ -1031,9 +1032,11 @@ class TheTube(gtk.Window):
         while i<store['ntot']:
           i+=NPERPAGE
           self.expand_store_background(store)
+        # fudge to allow some thumbnails to load:
         time.sleep(2)
         for row in store['store']:
           self.playlist['store'].append(row)
+        self.set_playlist_label()
 
 
     def on_add(self,widget=None):
@@ -1045,6 +1048,7 @@ class TheTube(gtk.Window):
             model = self.iconView.get_model()
             if model[item][COL_ITEM]['id']['kind']=="youtube#playlist":
               self.flash_cursor("blue")
+              #~ gtk.idle_add(self.add_playlist_to_playlist,model[item][COL_ITEM])
               t=threading.Thread(target=self.add_playlist_to_playlist, args=(model[item][COL_ITEM],))
               t.daemon=True
               t.start()            
@@ -1238,10 +1242,7 @@ class TheTube(gtk.Window):
           last=self.iconView.get_cursor()[0][0]+self.iconView.get_columns()        
           if last<MAX_STORE_SIZE and last>=len(self.store['store']):
             self.flash_message("** fetching data **")
-            self.expand_store_background(self.store)
-            #~ t=threading.Thread(target=self.expand_store_background, args=(self.store,))
-            #~ t.daemon=True
-            #~ t.start()
+            gtk.idle_add(self.expand_store_background,self.store)
             return True
               
     def on_key_press_event(self,widget, event):
