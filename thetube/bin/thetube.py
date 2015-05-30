@@ -28,6 +28,7 @@ from optparse import OptionParser
 import operator
 import pafy
 import cPickle
+from iso8601duration import parse_duration
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
@@ -490,12 +491,12 @@ class youtube_api_v3(object):
                 sock.close()
             return result
     
-        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,), 'type' : "single" }
+        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (len(videoids),), 'type' : "single" }
 
     def playlist_data(self,playlistids):
         
         def fetch_cb():
-            url = "https://www.googleapis.com/youtube/v3/videos"
+            url = "https://www.googleapis.com/youtube/v3/playlists"
             query = {
                 'key' : self.API_KEY,
                 'id': ','.join(playlistids),
@@ -507,6 +508,7 @@ class youtube_api_v3(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
+              print ex
               result=dict(data=dict(nextPageToken='',
                 pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
             finally:  
@@ -514,7 +516,7 @@ class youtube_api_v3(object):
                 sock.close()
             return result
     
-        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (videoid,), 'type' : "single" }
+        return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (len(playlistids),), 'type' : "single" }
 
 
 YT=youtube_api_v3()
@@ -764,6 +766,45 @@ class TheTube(gtk.Window):
           item['description']=data['description']
         else:
           item['description']="video description not found"
+
+    def pull_descriptions(self,rows):
+        videoids=[]
+        lookup=dict()
+        for row in rows:
+          if row[COL_ITEM]['kind']=="youtube#playlistItem":
+            vid=row[COL_ITEM]['snippet']['resourceId']['videoId']
+          else:
+            vid=row[COL_ITEM]['id']['videoId']
+          lookup[vid]=row
+          videoids.append(vid)
+        f=YT.video_data(videoids)['fetch_cb']
+        data=f()
+        ntot=data['pageInfo']['totalResults']
+        if ntot>0 and 'items' in data:
+          items= data['items']
+          for item in items:
+            lookup[item['id']][COL_ITEM]['snippet']=item['snippet']
+            lookup[item['id']][COL_ITEM]['contentDetails']=item['contentDetails']
+            duration=str(parse_duration(item['contentDetails']['duration']))
+            lookup[item['id']][COL_TOOLTIP]="["+duration+"] "+item['snippet']['title']
+
+    def pull_playlist_descriptions(self,rows):
+        videoids=[]
+        lookup=dict()
+        for row in rows:
+          vid=row[COL_ITEM]['id']['playlistId']
+          lookup[vid]=row
+          videoids.append(vid)
+        f=YT.playlist_data(videoids)['fetch_cb']
+        data=f()
+        ntot=data['pageInfo']['totalResults']
+        if ntot>0 and 'items' in data:
+          items= data['items']
+          for item in items:
+            lookup[item['id']][COL_ITEM]['snippet']=item['snippet']
+            lookup[item['id']][COL_ITEM]['contentDetails']=item['contentDetails']
+            lookup[item['id']][COL_TOOLTIP]="["+str(item['contentDetails']['itemCount'])+" videos] "+item['snippet']['title']
+
     
     def set_store(self, search=None,ordering="relevance",playlist_id=None):
         key=ytfeedkey(search,ordering,playlist_id)
@@ -862,6 +903,7 @@ class TheTube(gtk.Window):
 
         if ntot>0 and 'items' in f:
           items= f['items']
+          newrows=[]
   
           for i,item in enumerate(items):                
             #~ if not "duration" in item:
@@ -872,6 +914,8 @@ class TheTube(gtk.Window):
             title=item['snippet']['title']
             tooltip=title
             row=store.append([title, self.missing, item,tooltip,i])
+            newrows.append(store[row])
+            
             t=threading.Thread(target=self.pull_image, args=(store[row],))
             t.daemon=True
             t.start()
@@ -888,6 +932,14 @@ class TheTube(gtk.Window):
               #~ t.daemon=True
               #~ t.start()
 
+        if len(newrows)>0:
+          if feed['type'] in ["playlist-search","playlist-user"]:
+            t=threading.Thread(target=self.pull_playlist_descriptions, args=(newrows,))
+          else:
+            t=threading.Thread(target=self.pull_descriptions, args=(newrows,))
+          t.daemon=True
+          t.start()
+          
         if _store['ntot']>0:
           if feed["type"].startswith("playlist"):
             message=feed['description']+": showing %i out of %i"%(len(store),_store['ntot'])
