@@ -1,7 +1,11 @@
 import time
 import os
+import gtk
+import gobject
 from subprocess import call,Popen,PIPE
 from optparse import OptionParser
+
+gtk.gdk.threads_init()
 
 from thetube import video_player,ytdl,configuration_manager
 
@@ -60,57 +64,67 @@ class LocalClipboard(object):
     proc=Popen('xsel --display '+self.display+' --'+(self.selections[sel])+' -i', stdin=PIPE,shell=True)
     proc.communicate(data)
   def get_gtk(self,sel=0):
-    content=self.gtk.Clipboard(selection=self.selections[sel].upper()).wait_for_text()
+    with gtk.gdk.lock:
+      content=self.gtk.Clipboard(selection=self.selections[sel].upper()).wait_for_text()
     if content is None:
       content=""
     return content
   def set_gtk(self,data,sel=0):
-    cb = self.gtk.Clipboard( selection=self.selections[sel].upper() )
-    cb.set_text(data)
+    with gtk.gdk.lock:
+      cb = self.gtk.Clipboard( selection=self.selections[sel].upper() )
+      cb.set_text(data)
 
+class clipplayer(object):  
+  def __init__(self,fullscreen=False,preload_ytdl=False,vo_driver='xv',
+                 player="mpv",yt_fetcher="pafy",magic_string="stop"):
+    config=configuration_manager.read_config()
+  
+    bandwidth=config.setdefault("bandwidth","360p")
+    use_http=True if player=='mplayer' else False
+  
+    self.player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
+    self.yt=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
+            bandwidth=bandwidth,use_http=use_http)
+  
+    self.c=LocalClipboard(all_selections=True)
+    self.c.set('stop',sel=2)
+    time.sleep(0.6)
+    self.c.set(' ',sel=2)
+    self.sold=""
+    self.magic_string=magic_string
+  def error(self,data):
+    with gtk.gdk.lock:  
+      md = gtk.MessageDialog(None, 
+                0, gtk.MESSAGE_INFO, 
+                gtk.BUTTONS_OK, data)
+      gtk.timeout_add(5000,md.destroy)
+      md.run()
+      md.destroy()
+    #~ proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
+    #~ proc.communicate(data)
 
-def zenity_error(data):
-  proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
-  proc.communicate(data)
-
-
-def clipplayer(fullscreen=False,preload_ytdl=False,vo_driver='xv',
-               player="mpv",yt_fetcher="pafy",magic_string="stop"):
-  config=configuration_manager.read_config()
-
-  bandwidth=config.setdefault("bandwidth","360p")
-  use_http=True if player=='mplayer' else False
-
-  player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
-  yt=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
-          bandwidth=bandwidth,use_http=use_http)
-
-  c=LocalClipboard(all_selections=True)
-  c.set('stop',sel=2)
-  time.sleep(0.6)
-  c.set(' ',sel=2)
-  s=""  
-  sold=""
-  while not s.startswith(magic_string):
-    if s!=sold:
+  def check_clipboard(self):
+    s=self.c.get(sel=2)
+    if s.startswith(self.magic_string):
+      self.error("shutting down The Tube clipboard player")
+      gtk.main_quit()
+      return False
+    if s!=self.sold:
       if s.lstrip().startswith("http"):
-        #~ i=s.index("v=")
-        c.set("retrieving video url of "+s.lstrip())
+        self.c.set("retrieving video url of "+s.lstrip())
         try:
-          url=yt.get_video_url(s)#[i+2:i+13])
+          url=self.yt.get_video_url(s)
         except Exception as ex:
           url="FAIL"
-          zenity_error("The Tube playback failure: "+str(ex))
+          self.error("The Tube playback failure: "+str(ex))
         if not url.startswith("FAIL"):
-          player.play_url([url])
-          c.set("done playing (copy 'stop' to the clipboard to stop The Tube)",sel=2)
+          self.player.play_url([url])
+          self.c.set("done playing (copy 'stop' to the clipboard to stop The Tube)",sel=2)
         else:
-          c.set(url+"(copy 'stop' to the clipboard to stop The Tube)",sel=2)
-        yt.restart()
-
-    time.sleep(0.5)
-    sold=s
-    s=c.get(sel=2)
+          self.c.set(url+"(copy 'stop' to the clipboard to stop The Tube)",sel=2)
+        self.yt.restart()
+      self.sold=s
+    return True
 
 def new_option_parser():
     result = OptionParser(usage="usage: %prog [options]")
@@ -133,7 +147,9 @@ if __name__=="__main__":
   (options, args) = new_option_parser().parse_args()  
   print options
 
-  clipplayer( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
+  application=clipplayer( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
     vo_driver=options.video_driver,player=options.player,yt_fetcher=options.yt_fetcher,
     magic_string=options.magic_string)
 
+  gtk.timeout_add(500,application.check_clipboard)
+  gtk.main()
