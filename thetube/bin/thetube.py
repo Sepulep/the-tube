@@ -690,7 +690,7 @@ class TheTube(gtk.Window):
                     gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER, ('Cancel', 1, 'Select', 2))
         self.filechooser.set_current_folder(self.download_directory)
  
-        self.show_all()
+        #~ self.show_all()
 
         self.message.set_text(" Welcome to The Tube! (type 'h' for help)")
 
@@ -1400,4 +1400,5 @@ if __name__=="__main__":
 
   application=TheTube( fullscreen=options.fullscreen,preload_ytdl=options.preload_ytdl,
     vo_driver=options.video_driver,player=options.player,yt_fetcher=options.yt_fetcher)
+  application.show_all()
   gtk.main()
