@@ -65,8 +65,8 @@ class driver(object):
     self.clipplayer=clipplayer
     self.browser=browser
     self.icon=gtk.StatusIcon()
-    self.icon.set_from_file("../icon.png")
-    self.icon.connect("popup-menu",self.popup)
+    self.icon.set_from_file("../icon_tray.png")
+    self.icon.connect("button_press_event",self.popup)
 
     self.menu = gtk.Menu()
     self.menuitem1 = gtk.MenuItem()
@@ -89,15 +89,16 @@ class driver(object):
     if self.clipplayer.active:
       self.icon.set_from_file("../icon_active.png")    
     else:
-      self.icon.set_from_file("../icon.png")    
+      self.icon.set_from_file("../icon_tray.png")    
     return "Deactivate clipboard player" if self.clipplayer.active else "Activate clipboard player"
   def label_browser(self):
     return "Hide browser" if self.browser.active else "Open browser"
 
-  def popup(self,icon, button, time):
-      self.menuitem1.set_label(self.label())  
-      self.menuitem2.set_label(self.label_browser())  
-      self.menu.popup(None, None, None, button,time)
+  def popup(self,widget, event):    
+      if event.button==1 or event.button==3:
+        self.menuitem1.set_label(self.label())  
+        self.menuitem2.set_label(self.label_browser())  
+        self.menu.popup(None, None, gtk.status_icon_position_menu, event.button,event.time,self.icon)
 
   def activate(self,widget):
     self.clipplayer.activate()
