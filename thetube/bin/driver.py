@@ -23,7 +23,7 @@ class clipplayer_(clipplayer):
     else:
       self.active=active
     if (not prev) and self.active:
-      self.reset_clipboard()
+      gtk.idle_add(self.reset_clipboard)
       gtk.timeout_add(500,self.check_clipboard)
 
 class TheTube_(TheTube):
@@ -87,7 +87,7 @@ class driver(object):
   def label(self):
     return "Deactivate clipboard player" if self.clipplayer.active else "Activate clipboard player"
   def label_browser(self):
-    return "Deactivate browser" if self.browser.active else "Activate browser"
+    return "Hide browser" if self.browser.active else "Open browser"
 
   def popup(self,icon, button, time):
       self.menuitem1.set_label(self.label())  
