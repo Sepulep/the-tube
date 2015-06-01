@@ -23,7 +23,7 @@ class clipplayer_(clipplayer):
     else:
       self.active=active
     if (not prev) and self.active:
-      self.error("Starting The Tube clipboard player")
+      #~ self.error("Starting The Tube clipboard player")
       gtk.idle_add(self.reset_clipboard)
       gtk.timeout_add(500,self.check_clipboard)
 
@@ -78,12 +78,16 @@ class driver(object):
     
     self.menuitem1.connect("activate", self.activate)
     self.menuitem2.connect("activate", self.activate_browser)
-    quit.connect("activate", gtk.main_quit)
+    quit.connect("activate", self.on_quit)
 
     self.menu.append(self.menuitem2)
     self.menu.append(self.menuitem1)
     self.menu.append(quit)
     self.menu.show_all()
+
+  def on_quit(self,widget=None):
+    self.browser.cleanup()
+    gtk.main_quit()
 
   def label(self):
     if self.clipplayer.active:
