@@ -95,15 +95,19 @@ class clipplayer(object):
     self.c.set(' ',sel=2)
     self.sold=""
   def error(self,data):
-    with gtk.gdk.lock:  
-      md = gtk.MessageDialog(None, 
-                0, gtk.MESSAGE_INFO, 
-                gtk.BUTTONS_OK, data)
-      gtk.timeout_add(5000,md.destroy)
-      md.run()
-      md.destroy()
-    #~ proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
-    #~ proc.communicate(data)
+    proc = Popen('notify-send "'+data+'"', stdin=PIPE,shell=True)
+    proc.communicate(data)
+    if proc.returncode!=0:
+        proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
+        proc.communicate(data)      
+    if proc.returncode!=0:
+        with gtk.gdk.lock:  
+          md = gtk.MessageDialog(None, 
+                    0, gtk.MESSAGE_INFO, 
+                    gtk.BUTTONS_OK, data)
+          gtk.timeout_add(5000,md.destroy)
+          md.run()
+          md.destroy()
   def on_quit(self):
     self.error("shutting down The Tube clipboard player")
     gtk.main_quit()

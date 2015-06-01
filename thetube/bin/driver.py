@@ -23,6 +23,7 @@ class clipplayer_(clipplayer):
     else:
       self.active=active
     if (not prev) and self.active:
+      self.error("The Tube clipboard player now running")
       gtk.idle_add(self.reset_clipboard)
       gtk.timeout_add(500,self.check_clipboard)
 
