@@ -1367,6 +1367,8 @@ class TheTube(gtk.Window):
 #          self.buttontv.set_active(not self.buttontv.get_active())
           
     def on_quit(self, widget=None):
+        self.shutdown(widget)
+    def shutdown(self,widget=None):
         search_terms=dict(sorted(self.search_terms.iteritems(), key=operator.itemgetter(1))[-100:])
         config=dict(download_directory=self.download_directory,
                           bandwidth=self.bandwidth,search_terms=search_terms,

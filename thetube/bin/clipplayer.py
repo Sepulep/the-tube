@@ -89,9 +89,11 @@ class clipplayer(object):
     self.c=LocalClipboard(all_selections=True)
     self.c.set('stop',sel=2)
     time.sleep(0.6)
+    self.reset_clipboard()
+    self.magic_string=magic_string
+  def reset_clipboard(self):
     self.c.set(' ',sel=2)
     self.sold=""
-    self.magic_string=magic_string
   def error(self,data):
     with gtk.gdk.lock:  
       md = gtk.MessageDialog(None, 
@@ -102,18 +104,20 @@ class clipplayer(object):
       md.destroy()
     #~ proc = Popen('zenity --timeout 5 --warning --text="'+data+'"', stdin=PIPE,shell=True)
     #~ proc.communicate(data)
-
+  def on_quit(self):
+    self.error("shutting down The Tube clipboard player")
+    gtk.main_quit()
   def check_clipboard(self):
     s=self.c.get(sel=2)
     if s.startswith(self.magic_string):
-      self.error("shutting down The Tube clipboard player")
-      gtk.main_quit()
-      return False
+      self.on_quit()
     if s!=self.sold:
       if s.lstrip().startswith("http"):
         self.c.set("retrieving video url of "+s.lstrip())
         try:
           url=self.yt.get_video_url(s)
+          if url.startswith("FAIL"):
+            raise Exception("Failed playback of "+s)
         except Exception as ex:
           url="FAIL"
           self.error("The Tube playback failure: "+str(ex))
