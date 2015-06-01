@@ -16,7 +16,8 @@ ldd /mnt/utmp/thetube/bin/mpv
 #fi
 
 OPTION1="run The Tube"
-OPTION2="run The Tube clipboard player"
+OPTION2a="run The Tube browser only"
+OPTION2b="run The Tube clipboard player only"
 OPTION3="update youtube-dl"
 OPTION4="revert youtube-dl to pnd version"
 OPTION5="enter new API key"
@@ -26,7 +27,8 @@ SELECT=`zenity --list --width=360 --height=280 \
   --title="What do you want to run?" --radiolist \
   --column="" --column="Description" \
    TRUE "$OPTION1" \
-   FALSE "$OPTION2" \
+   FALSE "$OPTION2a" \
+   FALSE "$OPTION2b" \
    FALSE "$OPTION3" \
    FALSE "$OPTION4" \
    FALSE "$OPTION5" \
@@ -39,14 +41,18 @@ fi
 echo $SELECT
 if [ "$SELECT" == "$OPTION1" ]; then
 cd /mnt/utmp/thetube/bin/
+python driver.py -f -p -v mpv -d x11 -y pafy
+fi
+if [ "$SELECT" == "$OPTION2a" ]; then
+cd /mnt/utmp/thetube/bin/
 python thetube.py -f -p -v mpv -d x11 -y pafy
 fi
-if [ "$SELECT" == "$OPTION2" ]; then
+if [ "$SELECT" == "$OPTION2b" ]; then
 cd /mnt/utmp/thetube/bin/
 zenity --info --text="The Tube clipboard player: plays youtube links copied to the clipboard (ctrl-c) automagically until 'stop' is copied to the clipboard" \
   --timeout=5 &
 python clipplayer.py -f -p -v mpv -d x11 -y pafy
-zenity --info --text="The Tube clipboard player has shutdown"
+#~ zenity --info --text="The Tube clipboard player has shutdown"
 fi
 if [ "$SELECT" == "$OPTION3" ]; then
 cd /mnt/utmp/thetube/bin/
