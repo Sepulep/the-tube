@@ -1311,6 +1311,8 @@ class TheTube(gtk.Window):
           self.forwardButton.emit("activate")
         if keyname in ["Page_Up"]:
           self.backButton.emit("activate")
+        if keyname in ["Escape"]:
+          self.exitButton.emit("activate")          
         if self.entry.is_focus():
           return False
         if keyname in ["s","S"]:
@@ -1326,7 +1328,7 @@ class TheTube(gtk.Window):
           self.backButton.emit("activate")
         if keyname in ["o","O"]:
           self.sortButton.emit("activate")
-        if keyname in ["Q","q","Escape"]:
+        if keyname in ["Q","q"]:
           self.exitButton.emit("activate")
         if keyname in ["h","H"]:
           self.helpButton.emit("activate")
