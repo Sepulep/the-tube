@@ -56,6 +56,7 @@ class TheTube_(TheTube):
     if (not prev) and self.active:
       self.show_all()
       self.present()
+      self.entry.grab_focus()
     if prev and not self.active:
       self.hide_all()
 
