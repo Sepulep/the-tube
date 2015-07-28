@@ -258,7 +258,7 @@ class video_player(object):
           call.extend(['-no-video'])
         else:
           call.extend(['--no-osc','--no-osd-bar','--osd-font-size=30',
-                  '--cache=256','--framedrop=yes'])
+                  '--cache=2048','--framedrop=yes'])
           if self.fullscreen:
             call.extend(['--fs'])
           if not self.keep_aspect:
