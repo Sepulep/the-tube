@@ -150,13 +150,17 @@ class ytdl(object):
         return url
 
     def get_video_url_pafy(self,url):
-        v=pafy.new(url)
-        bw_list=self.yt_bandwidths()
-        for b in bw_list:
-          for s in v.streams:
-            if int(s.itag)==b:
-              url=s.url if self.use_http else s.url_https
-              return url
+        try:
+          v=pafy.new(url,basic=False)
+          bw_list=self.yt_bandwidths()
+          for b in bw_list:
+            for s in v.streams:
+              if int(s.itag)==b:
+                url=s.url if self.use_http else s.url_https
+                return url
+        except Exception as ex:
+          print ex
+          pass
         return "FAIL get_video_url_pafy"
 
     def yt_bandwidths(self):
@@ -258,7 +262,7 @@ class video_player(object):
           call.extend(['-no-video'])
         else:
           call.extend(['--no-osc','--no-osd-bar','--osd-font-size=30',
-                  '--cache=2048','--framedrop=yes'])
+                  '--cache=8000','--cache-initial=512','--framedrop=yes'])
           if self.fullscreen:
             call.extend(['--fs'])
           if not self.keep_aspect:
@@ -645,6 +649,8 @@ class TheTube(gtk.Window):
         self.infoView.modify_font(pango.FontDescription("sans 8"))
         self.infoView.set_wrap_mode(gtk.WRAP_WORD)
         self.infoView_sw.set_no_show_all(True)
+        self.infoView.set_property('editable', False)
+        self.infoView.set_property('cursor-visible', False)
 
         self.message=gtk.Label(" ")
         self.message.set_single_line_mode(True)
@@ -1183,7 +1189,8 @@ class TheTube(gtk.Window):
            item=items[0]
            model = widget.get_model()
            self.message.set_text(truncate(model[item][COL_TOOLTIP]))
-           self.infoView.get_buffer().set_text(model[item][COL_ITEM]['snippet']['description'])
+           infotxt="https://www.youtube.com/watch?v="+model[item][COL_ITEM]['id']['videoId']+"\n\n"+model[item][COL_ITEM]['snippet']['description']
+           self.infoView.get_buffer().set_text(infotxt)
 
     def flash_cursor(self,color="green"):
         self.iconView.modify_bg(gtk.STATE_SELECTED, gtk.gdk.Color(color))
