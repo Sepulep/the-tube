@@ -373,8 +373,8 @@ class youtube_api_v3(object):
               result=json.load(sock)
             except Exception as ex:
               print ex
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -403,8 +403,8 @@ class youtube_api_v3(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -430,8 +430,8 @@ class youtube_api_v3(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -461,8 +461,8 @@ class youtube_api_v3(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
 
             finally:  
               if sock:
@@ -488,8 +488,8 @@ class youtube_api_v3(object):
               sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
               result=json.load(sock)
             except Exception as ex:
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -513,8 +513,8 @@ class youtube_api_v3(object):
               result=json.load(sock)
             except Exception as ex:
               print ex
-              result=dict(data=dict(nextPageToken='',
-                pageInfo={'totalResults':0,'resultsPerPage':0}),exception=str(ex))
+              result=dict(nextPageToken="",
+                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
             finally:  
               if sock:
                 sock.close()
@@ -853,7 +853,7 @@ class TheTube(gtk.Window):
         return self.stores[key]
     
     def new_store(self,key):
-        store=dict(store=self.create_store(),ntot=-1,nextPageToken='',key=key,message="uninit",type="uninit",
+        store=dict(store=self.create_store(),ntot=-1,nextPageToken="",key=key,message="uninit",type="uninit",
          updating=False)
         self.expand_store(store)
         return store
@@ -890,6 +890,9 @@ class TheTube(gtk.Window):
         
                   
         f=feed['fetch_cb'](page,NPERPAGE, ordering)
+        if "exception" in f:
+          print "exception:", f["exception"]
+
 
         reset=False
         if _store['store']==self.iconView.get_model():
@@ -907,9 +910,9 @@ class TheTube(gtk.Window):
         else:
           _store['nextPageToken']=None
 
+        newrows=[]
         if ntot>0 and 'items' in f:
           items= f['items']
-          newrows=[]
   
           for i,item in enumerate(items):                
             #~ if not "duration" in item:
