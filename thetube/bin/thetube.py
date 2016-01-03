@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=search, 'n'=next, 'p'=previous,
+DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=search, 'n'=next, 'p'=previous screen,
       'o'=change order, 'enter'=play, '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio,
       'd'=download, 'f'=set download folder, 'q'=quit
 Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"

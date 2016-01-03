@@ -4,7 +4,7 @@
 
    <package id="thetube">
            <author name="Sepulep" website="http://www.openpandora.org/"/>
-           <version major="0" minor="3" release="3" build="3"/>
+           <version major="0" minor="3" release="3" build="4"/>
            <titles>
                    <title lang="en_US">The Tube</title>
            </titles>
@@ -18,7 +18,7 @@
     <title lang="en_US">The Tube</title>
 
     <author name="Sepulep" website="http://www.openpandora.org/"/>
-    <version major="0" minor="3" release="3" build="3"/>	      <!--This programs version-->
+    <version major="0" minor="3" release="3" build="4"/>	      <!--This programs version-->
     <osversion major="1" minor="5" release="5" build="0"/>		<!--The minimum OS version required-->
 
     <description lang="en_US">A freeware minimalistic youtube browser.</description>
