@@ -30,6 +30,14 @@ import pafy
 import cPickle
 from iso8601duration import parse_duration
 
+try:
+  import ctypes
+  from ctypes.util import find_library
+  libc = ctypes.CDLL(find_library("c"))
+  res_init=libc.__res_init
+except:
+  res_init=lambda : None
+
 #gobject.threads_init() 
 gtk.gdk.threads_init()
 
