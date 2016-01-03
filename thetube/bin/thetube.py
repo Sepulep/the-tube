@@ -978,24 +978,27 @@ class TheTube(gtk.Window):
         model = widget.get_model()
         title = model[item][COL_TITLE]
         #~ print "click on:", title
-
-        if model[item][COL_ITEM]['id']['kind']=="youtube#playlist":
+        if model[item][COL_ITEM]['kind']=="youtube#playlistItem":
+          url = model[item][COL_ITEM]['snippet']['resourceId']['videoId']        
+        elif model[item][COL_ITEM]['id']['kind']=="youtube#playlist":
           #~ print "playlistID:",model[item][COL_ITEM]['id']['playlistId']
-          self.set_store(playlist_id=model[item][COL_ITEM]['id']['playlistId'])        
+          self.set_store(playlist_id=model[item][COL_ITEM]['id']['playlistId'])
+          return
         else:
-          if self.playing:
-             #~ print "ignore"
-             self.flash_cursor("red")
-             return
-          self.flash_cursor("green")
-          self.playing=True
-  
           url = model[item][COL_ITEM]['id']['videoId']
-          print 'Playing ' + url
-  
-          t=threading.Thread(target=self.play, args=(url,title))
-          t.daemon=True
-          t.start()
+
+        print 'Playing ' + url
+
+        if self.playing:
+          print "already playing, ignore"
+          self.flash_cursor("red")
+          return
+        self.flash_cursor("green")
+        self.playing=True
+    
+        t=threading.Thread(target=self.play, args=(url,title))
+        t.daemon=True
+        t.start()
 
     def on_play_playlist(self, widget=None):
         if self.playing or len(self.playlist['store'])==0:
