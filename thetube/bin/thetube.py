@@ -724,14 +724,17 @@ class TheTube(gtk.Window):
         else:
           item['description']="video description not found"
 
+    def get_videoid_from_item(self,item):
+        if item['kind']=="youtube#playlistItem":
+            return item['snippet']['resourceId']['videoId']
+        else:
+            return item['id']['videoId']
+
     def pull_descriptions(self,rows):
         videoids=[]
         lookup=dict()
         for row in rows:
-          if row[COL_ITEM]['kind']=="youtube#playlistItem":
-            vid=row[COL_ITEM]['snippet']['resourceId']['videoId']
-          else:
-            vid=row[COL_ITEM]['id']['videoId']
+          vid=self.get_videoid_from_item(row[COL_ITEM])
           lookup[vid]=row
           videoids.append(vid)
         f=YT.video_data(videoids)['fetch_cb']
@@ -758,7 +761,7 @@ class TheTube(gtk.Window):
         if ntot>0 and 'items' in data:
           items= data['items']
           for item in items:
-            lookup[item['id']][COL_ITEM]['snippet']=item['snippet']
+            lookup[item['id']][COL_ITEM]['snippet'].update(item['snippet'])
             lookup[item['id']][COL_ITEM]['contentDetails']=item['contentDetails']
             lookup[item['id']][COL_TOOLTIP]="["+str(item['contentDetails']['itemCount'])+" videos] "+item['snippet']['title']
 
@@ -1032,7 +1035,7 @@ class TheTube(gtk.Window):
           self.set_store(*self.prev_key)
 
     def get_item_video_url(self, item):
-        print self.yt_dl.get_video_url( item['id']['videoId'])
+        return self.yt_dl.get_video_url( self.get_videoid_from_item(item))
 
     def set_playlist_label(self):
         self.playlistButton.set_label(str(len(self.playlist['store'])))
@@ -1114,7 +1117,7 @@ class TheTube(gtk.Window):
            item=items[0]
            model = self.iconView.get_model()
            title = model[item][COL_TITLE]
-           url = model[item][COL_ITEM]['id']['videoId']
+           url = self.get_videoid_from_item(model[item][COL_ITEM])
            if url not in self.current_downloads:
              self.current_downloads.add(url)
              print 'downloading ' + url
@@ -1199,7 +1202,7 @@ class TheTube(gtk.Window):
         gobject.timeout_add(1000, self.busy_message,0,truncate("busy playing playlist"))
         urllist=[]
         for item in playlist:
-          url=self.yt_dl.get_video_url( item[COL_ITEM]['id']['videoId'])
+          url=self.yt_dl.get_video_url( self.get_videoid_from_item(item[COL_ITEM]))
           if url.startswith("http"):
             urllist.append(url)
           else:
