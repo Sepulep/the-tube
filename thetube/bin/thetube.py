@@ -35,6 +35,7 @@ try:
   from ctypes.util import find_library
   libc = ctypes.CDLL(find_library("c"))
   res_init=libc.__res_init
+  print "DNS fix implemented"
 except:
   res_init=lambda : None
 
@@ -311,6 +312,22 @@ class youtube_api_v3(object):
     order_dict=dict(relevance="relevance",date="last uploaded",viewCount="most viewed",rating="rating")
     orderings=["relevance","date","viewCount","rating"]
 
+    @staticmethod
+    def load_json(url,query):
+      res_init()
+      #~ print '%s?%s' % (url, urllib.urlencode(query))
+      try:
+        sock=None
+        sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
+        result=json.load(sock)
+      except Exception as ex:
+        result=dict(nextPageToken="",
+          pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
+      finally:  
+        if sock:
+          sock.close()
+      return result
+
     def __init__(self,API_KEY=None):
       if API_KEY is None:
         f=open('API_KEY','r')
@@ -373,20 +390,7 @@ class youtube_api_v3(object):
                 'order': ordering,
                 'pageToken' : pageToken
             }
-
-            try:
-              print '%s?%s' % (url, urllib.urlencode(query))
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              print ex
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-            finally:  
-              if sock:
-                sock.close()
-            return result
+            return youtube_api_v3.load_json(url,query)
         description = 'search for user "%s"' % (terms,)
         return { 'fetch_cb': fetch_cb, 'description': description, 'type' : "search" }
 
@@ -403,20 +407,9 @@ class youtube_api_v3(object):
                 'order': ordering,
                 'pageToken' : pageToken
             }
-
             #~ if user:
               #~ query['author']=user
-            try:
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-            finally:  
-              if sock:
-                sock.close()
-            return result
+            return youtube_api_v3.load_json(url,query)
         description = 'search for "%s"' % (terms,)
         if user: description=description + ' by: "%s"'%(user,) 
         return { 'fetch_cb': fetch_cb, 'description': description, 'type' : "search" }
@@ -433,17 +426,7 @@ class youtube_api_v3(object):
                 'order': ordering,
                 'pageToken' : pageToken
             }
-            try:
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-            finally:  
-              if sock:
-                sock.close()
-            return result
+            return youtube_api_v3.load_json(url,query)
         description = 'playlist search for "%s"' % (terms,)
         feedtype="playlist-search"
         if user: 
@@ -461,24 +444,8 @@ class youtube_api_v3(object):
                 'maxResults': maxresults,
                 'pageToken' : pageToken
             }
-
-            #~ url = 'https://gdata.youtub
-            try:
-              print '%s?%s' % (url, urllib.urlencode(query))
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-
-            finally:  
-              if sock:
-                sock.close()
-            return result
-    
+            return youtube_api_v3.load_json(url,query)    
         feed = { 'fetch_cb': fetch_cb, 'description': 'feed of playlist %s' % (playlist_id,), 'type' : "playlist" }
-
         return feed
         
     def video_data(self,videoids):
@@ -491,18 +458,7 @@ class youtube_api_v3(object):
                 'part' : "snippet,contentDetails",
                 'maxResults' : len(videoids)
             }
-            try:
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-            finally:  
-              if sock:
-                sock.close()
-            return result
-    
+            return youtube_api_v3.load_json(url,query)
         return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (len(videoids),), 'type' : "single" }
 
     def playlist_data(self,playlistids):
@@ -515,21 +471,8 @@ class youtube_api_v3(object):
                 'part' : "snippet,contentDetails",
                 'maxResults' : len(playlistids)
             }
-            try:
-              sock=None
-              sock=urllib2.urlopen('%s?%s' % (url, urllib.urlencode(query)))
-              result=json.load(sock)
-            except Exception as ex:
-              print ex
-              result=dict(nextPageToken="",
-                pageInfo={'totalResults':0,'resultsPerPage':0},exception=str(ex))
-            finally:  
-              if sock:
-                sock.close()
-            return result
-    
+            return youtube_api_v3.load_json(url,query)
         return { 'fetch_cb': fetch_cb, 'description': 'data for "%s"' % (len(playlistids),), 'type' : "single" }
-
 
 YT=youtube_api_v3()
 #~ YT=dummy_api()
@@ -797,7 +740,7 @@ class TheTube(gtk.Window):
         if ntot>0 and 'items' in data:
           items= data['items']
           for item in items:
-            lookup[item['id']][COL_ITEM]['snippet']=item['snippet']
+            lookup[item['id']][COL_ITEM]['snippet'].update(item['snippet'])
             lookup[item['id']][COL_ITEM]['contentDetails']=item['contentDetails']
             duration=str(parse_duration(item['contentDetails']['duration']))
             lookup[item['id']][COL_TOOLTIP]="["+duration+"] "+item['snippet']['title']
@@ -840,7 +783,7 @@ class TheTube(gtk.Window):
           i=self.keys_for_stores.index(key)
           b1=False if i==0 else True
           b2=False if i==len(self.keys_for_stores)-1 else True
-          print i, len(self.keys_for_stores),b1,b2
+          #~ print i, len(self.keys_for_stores),b1,b2
         except:
           b1=b2=False
         self.backButton.set_sensitive(b1)    
@@ -1034,14 +977,14 @@ class TheTube(gtk.Window):
     def on_item_activated(self, widget, item):
         model = widget.get_model()
         title = model[item][COL_TITLE]
-        print "click on:", title
+        #~ print "click on:", title
 
         if model[item][COL_ITEM]['id']['kind']=="youtube#playlist":
-          print "playlistID:",model[item][COL_ITEM]['id']['playlistId']
+          #~ print "playlistID:",model[item][COL_ITEM]['id']['playlistId']
           self.set_store(playlist_id=model[item][COL_ITEM]['id']['playlistId'])        
         else:
           if self.playing:
-             print "ignore"
+             #~ print "ignore"
              self.flash_cursor("red")
              return
           self.flash_cursor("green")
@@ -1200,7 +1143,15 @@ class TheTube(gtk.Window):
            item=items[0]
            model = widget.get_model()
            self.message.set_text(truncate(model[item][COL_TOOLTIP]))
-           infotxt="https://www.youtube.com/watch?v="+model[item][COL_ITEM]['id']['videoId']+"\n\n"+model[item][COL_ITEM]['snippet']['description']
+           infotxt=""
+           if model[item][COL_ITEM]['kind']=='youtube#playlistItem':
+             infotxt+="https://www.youtube.com/watch?v="+model[item][COL_ITEM]['snippet']['resourceId']['videoId']
+           if model[item][COL_ITEM]['kind']=='youtube#searchResult':
+             if model[item][COL_ITEM]['id'].has_key('videoId'):
+               infotxt+="https://www.youtube.com/watch?v="+model[item][COL_ITEM]['id']['videoId']
+             if model[item][COL_ITEM]['id'].has_key('playlistId'):
+               infotxt+="https://www.youtube.com/view_play_list?p="+model[item][COL_ITEM]['id']['playlistId']
+           infotxt+="\n\n"+model[item][COL_ITEM]['snippet']['description']
            self.infoView.get_buffer().set_text(infotxt)
 
     def flash_cursor(self,color="green"):
