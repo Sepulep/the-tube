@@ -1,8 +1,8 @@
 #!/usr/bin/python
 
-DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=search, 'n'=next results, 'p'=previous results,
-      'o'=change order, 'enter'=play, '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio, 'd'=download,
-      'f'=set download folder, 'q'=quit
+DOCSTRING="""General keyboard shortcuts: 'h'=this help, 'i'=clip info, 's'=search, 'n'=next, 'p'=previous,
+      'o'=change order, 'enter'=play, '2'=max 240p', '3'=max 360p, '4'=max 480p, 'k'= toggle keep aspect ratio,
+      'd'=download, 'f'=set download folder, 'q'=quit
 Playlist commands: 'a'=add, 'l'=toggle view, 'r'=remove/cut, 'c'=clear, 'space'=play"
 Advanced commands: 'm'=cycle through video players, 'y'=switch youtube query library, 'alt/start'=go home & clear cache, 'Z'=set new start screen
 Special search strings: 'pl:' search for playlists, 'u:user' search for uploads from 'user'
@@ -271,7 +271,7 @@ class video_player(object):
           call.extend(['-no-video'])
         else:
           call.extend(['--no-osc','--no-osd-bar','--osd-font-size=30',
-                  '--cache=8000','--cache-initial=512','--framedrop=yes'])
+                  '--cache=4000','--cache-initial=512','--framedrop=yes'])
           if self.fullscreen:
             call.extend(['--fs'])
           if not self.keep_aspect:
