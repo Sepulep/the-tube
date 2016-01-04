@@ -804,6 +804,8 @@ class TheTube(gtk.Window):
           if len(self.keys_for_stores)>MAX_STORES:
             key=self.keys_for_stores.pop(0)
             self.stores.pop(key)
+        elif "exception" in self.stores[key]:
+          self.stores[key]=self.new_store(key)
         return self.stores[key]
     
     def new_store(self,key):
@@ -846,6 +848,7 @@ class TheTube(gtk.Window):
         f=feed['fetch_cb'](page,NPERPAGE, ordering)
         if "exception" in f:
           print "exception:", f["exception"]
+          _store['exception']=f["exception"]
 
 
         reset=False
