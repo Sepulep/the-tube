@@ -26,7 +26,6 @@ import datetime
 import atexit
 from optparse import OptionParser
 import operator
-import pafy
 import cPickle
 from iso8601duration import parse_duration
 
@@ -38,6 +37,11 @@ try:
   print "DNS fix implemented"
 except:
   res_init=lambda : None
+
+# insert youtube-dl in path to allow zip import of youtube_dl
+sys.path.insert(0,"youtube-dl")
+import pafy
+
 
 #gobject.threads_init() 
 gtk.gdk.threads_init()
