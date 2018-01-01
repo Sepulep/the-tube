@@ -73,7 +73,7 @@ MAX_STORE_SIZE=1000
 
 AVAILABLE_VIDEO_PLAYERS=[("mpv","x11"),("mpv","xv")]
 if subprocess.call(["which","/mnt/utmp/panplayer2/bin/mplayer"])==0:
-  AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","sdl"),("mplayer","omapfb")])
+  AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","sdl")]) #,("mplayer","omapfb")])
 
 def truncate(string,nstring=NSTRING):
   return (string[:nstring] + '..') if len(string) > (nstring+2) else string
