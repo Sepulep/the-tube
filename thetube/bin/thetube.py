@@ -486,7 +486,7 @@ class TheTube(gtk.Window):
     def __init__(self, fullscreen=False,preload_ytdl=False,vo_driver="xv", player='mplayer',yt_fetcher="youtube-dl"):
         config=configuration_manager.read_config()
 
-        self.player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
+        self.player=video_player(config.setdefault("player",player), fullscreen=fullscreen, vo_driver=config.setdefault("vo_driver",vo_driver), keep_aspect=False)
 
         self.bandwidth=config.setdefault("bandwidth","360p")
         self.use_http=False #True if player=='mplayer' else False
@@ -1359,7 +1359,8 @@ class TheTube(gtk.Window):
         search_terms=dict(sorted(self.search_terms.iteritems(), key=operator.itemgetter(1))[-100:])
         config=dict(download_directory=self.download_directory,
                           bandwidth=self.bandwidth,search_terms=search_terms,
-                          default_key=self.default_key)      
+                          default_key=self.default_key, 
+                          player=self.player.player, vo_driver=self.player.vo_driver)      
         configuration_manager.write_config(config)
         ts=threading.enumerate()
         for t in ts[1:]:
