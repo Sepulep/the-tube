@@ -20,9 +20,8 @@ You can use the mouse or the keyboard for input. Press h or the help
 button to get help on the keyboard shortcuts. Videos can be played from 
 the browser by double clicking or pressing enter, or downloaded by 
 pressing <d>. Currently it no longer needs mplayer installed: 'm' 
-toggles between different playback options (mpv or mplayer). In any 
-case, should it become necessary, it can be installed with the community 
-codec pack: http://openpandora.org/downloads/CodecPack.pnd).
+toggles between different playback options (mpv or mplayer). If available
+it will try to use the mplayer from PanPlayer2.
 
 The preferred quality of playback can be selected - it will fallback on 
 lower bitrates if the preferred option is not available.

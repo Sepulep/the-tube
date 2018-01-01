@@ -72,8 +72,8 @@ MAX_STORES=30
 MAX_STORE_SIZE=1000
 
 AVAILABLE_VIDEO_PLAYERS=[("mpv","x11"),("mpv","xv")]
-if subprocess.call(["which","mplayer"])==0:
-  AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","xv"),("mplayer","omapfb")])
+if subprocess.call(["which","/mnt/utmp/panplayer2/mplayer"])==0:
+  AVAILABLE_VIDEO_PLAYERS.extend([("mplayer","sdl"),("mplayer","omapfb")])
 
 def truncate(string,nstring=NSTRING):
   return (string[:nstring] + '..') if len(string) > (nstring+2) else string
@@ -253,7 +253,7 @@ class video_player(object):
         print "playing done"
 
     def call_mplayer(self):
-        call = ['mplayer', '-cache-min','50','-quiet','-playlist', self.TMPFILE]
+        call = ['mplayer_wrap.sh', '-cache-min','50','-quiet','-playlist', self.TMPFILE]
         if self.novideo:
           call.extend(['-novideo'])
         else:
