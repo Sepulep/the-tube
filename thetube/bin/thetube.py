@@ -253,7 +253,7 @@ class video_player(object):
         print "playing done"
 
     def call_mplayer(self):
-        call = ['mplayer_wrap.sh', '-cache-min','50','-quiet','-playlist', self.TMPFILE]
+        call = ['mplayer_wrap.sh','-noconsolecontrols','-really-quiet','-playlist', self.TMPFILE]
         if self.novideo:
           call.extend(['-novideo'])
         else:

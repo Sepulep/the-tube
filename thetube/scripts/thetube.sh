@@ -35,7 +35,6 @@ path_to_pnd="$pnd_path/$pnd_name"
  
 #automount it
 /usr/pandora/scripts/pnd_run.sh -p "$path_to_pnd" -b "$pnd_folder" -m
-sleep 2
 panplayer2=2
 mounted="Mounted $pnd_name"
 fi
@@ -116,7 +115,8 @@ exit 1
 fi
 fi
 
-if [ "$panplayer2" = "2" ];then
+if [ "$panplayer2" == "2" ];then
  /usr/pandora/scripts/pnd_run.sh -p "$path_to_pnd" -b "$pnd_folder" -u
+ sleep 1
 fi
 
