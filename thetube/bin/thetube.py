@@ -489,7 +489,7 @@ class TheTube(gtk.Window):
         self.player=video_player(player, fullscreen=fullscreen, vo_driver=vo_driver, keep_aspect=False)
 
         self.bandwidth=config.setdefault("bandwidth","360p")
-        self.use_http=True if player=='mplayer' else False
+        self.use_http=False #True if player=='mplayer' else False
         self.default_key=config.setdefault("default_key",ytfeedkey("Openpandora","relevance",None))
 
         self.yt_dl=ytdl(yt_fetcher=yt_fetcher,preload_ytdl=preload_ytdl,
@@ -1259,7 +1259,7 @@ class TheTube(gtk.Window):
         AVAILABLE_VIDEO_PLAYERS.extend([(p,v)])
         self.player.player=p
         self.player.vo_driver=v
-        self.yt_dl.use_http=True if p=='mplayer' else False
+        self.yt_dl.use_http=False #True if p=='mplayer' else False
         self.flash_message("changed video player to: "+p+" with "+v)
     
     def on_yt_fetcher(self):
@@ -1375,7 +1375,7 @@ def new_option_parser():
     result.add_option("-v", action="store", dest="player",
                       help="video player to use (mpv or mplayer)",default='mplayer')
     result.add_option("-d", action="store", dest="video_driver",
-                      help="driver to use (eg xv, x11) ",default='xv')
+                      help="driver to use (eg xv, x11, sdl)",default='sdl')
     result.add_option("-y", action="store", dest="yt_fetcher",
                       help="youtube query to use (youtube-dl or pafy) ",default='youtube-dl')
     return result
