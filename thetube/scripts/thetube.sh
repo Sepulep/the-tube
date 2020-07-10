@@ -8,6 +8,8 @@ export LD_LIBRARY_PATH=/mnt/utmp/thetube/lib:$LD_LIBRARY_PATH
 
 export HOME="/mnt/utmp/thetube"
 
+export LC_ALL=en_US.UTF-8
+
 ldd /mnt/utmp/thetube/bin/mpv
 
 #Automount of PanPlayer2
